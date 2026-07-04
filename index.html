@@ -1,0 +1,1549 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>專案需求說明表 · 填寫工具</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<style>
+  :root{
+    --navy:#1F4E79;
+    --navy-dark:#1a3d6e;
+    --blue:#2E75B6;
+    --light-blue:#BDD7EE;
+    --label-bg:#DEEAF1;
+    --star-bg:#FFF2CC;
+    --star-label:#7F6000;
+    --border:#B8CCE4;
+    --gray-bg:#F2F2F2;
+    --green:#E2EFDA;
+    --orange:#FCE4D6;
+    --red:#C00000;
+    --text:#1F2D3D;
+    --muted:#8898A8;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;font-family:"Microsoft JhengHei","微軟正黑體","PingFang TC","Noto Sans TC",sans-serif;color:var(--text);background:#EDF2F7;height:100vh;overflow:hidden}
+
+  .app{display:flex;height:100vh}
+
+  /* ═══ 欄一：紀錄側欄 ═══ */
+  .sidebar{width:240px;min-width:200px;background:var(--navy-dark);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
+  .sidebar-header{padding:14px 14px 10px;flex-shrink:0}
+  .sidebar-header h2{color:#fff;font-size:13px;font-weight:700;letter-spacing:.5px;margin:0 0 10px}
+  .btn-new{width:100%;background:#fff;color:var(--navy-dark);border:none;border-radius:6px;padding:8px 10px;font-size:12px;font-weight:700;cursor:pointer;transition:background .2s;text-align:left}
+  .btn-new:hover{background:#e8f0fe}
+  .btn-new span{font-size:15px;margin-right:4px}
+  .records-search{margin-top:8px;width:100%;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);border-radius:6px;padding:6px 10px;font-size:12px;color:#fff;outline:none;font-family:inherit}
+  .records-search::placeholder{color:rgba(255,255,255,.5)}
+  .records-search:focus{background:rgba(255,255,255,.22)}
+  .btn-io-row{display:flex;gap:5px;margin-top:6px}
+  .btn-io{flex:1;background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:5px;padding:5px 4px;font-size:11px;cursor:pointer;transition:background .2s;text-align:center;font-weight:600;font-family:inherit}
+  .btn-io:hover{background:rgba(255,255,255,.24)}
+
+  .sidebar-body{flex:1;overflow-y:auto;padding:0 8px 12px}
+  .sidebar-body::-webkit-scrollbar{width:4px}
+  .sidebar-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.2);border-radius:2px}
+
+  .record-group-header{color:rgba(255,255,255,.6);font-size:10px;font-weight:700;letter-spacing:1px;padding:10px 12px 4px;margin-top:4px;border-top:1px solid rgba(255,255,255,.1);cursor:pointer;display:flex;align-items:center;gap:4px;user-select:none}
+  .record-group-header:first-child{border-top:none;margin-top:0}
+  .record-group-header:hover{color:rgba(255,255,255,.9)}
+  .record-group-count{background:rgba(255,255,255,.15);border-radius:8px;padding:1px 6px;font-size:10px}
+  .record-group-arrow{font-size:9px;transition:transform .2s;margin-left:auto}
+  .record-group-arrow.collapsed{transform:rotate(-90deg)}
+  .record-group-items.collapsed{display:none}
+
+  .record-item{background:rgba(255,255,255,.1);border-radius:7px;padding:10px 11px;margin:0 0 6px;cursor:pointer;transition:background .15s;position:relative;border:1px solid transparent}
+  .record-item:hover{background:rgba(255,255,255,.18)}
+  .record-item.active{background:rgba(255,255,255,.22);border-color:rgba(255,255,255,.45)}
+  .record-item-title{color:#fff;font-size:12px;font-weight:700;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:20px}
+  .record-item-meta{color:rgba(255,255,255,.65);font-size:11px}
+  .record-item-amount{color:#ffd;font-size:11px;font-weight:600}
+  .record-status{display:inline-block;font-size:10px;padding:1px 6px;border-radius:8px;margin-right:4px;font-weight:600}
+  .record-status.draft{background:rgba(255,255,255,.15);color:rgba(255,255,255,.7)}
+  .record-status.pending{background:#FFD966;color:#7F6000}
+  .record-status.approved{background:#4ECB71;color:#fff}
+  .record-status.rejected{background:#E06060;color:#fff}
+  .record-delete{position:absolute;top:8px;right:8px;background:none;border:none;color:rgba(255,255,255,.4);font-size:14px;cursor:pointer;line-height:1;padding:2px 4px;border-radius:3px;transition:all .15s}
+  .record-delete:hover{color:#ff8080;background:rgba(255,0,0,.15)}
+  .records-empty{color:rgba(255,255,255,.45);font-size:12px;text-align:center;padding:20px 10px;line-height:1.6}
+
+  /* ═══ 欄二＋欄三：主區 ═══ */
+  .main{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+
+  .toolbar{background:var(--navy);color:#fff;padding:8px 16px;display:flex;align-items:center;gap:10px;box-shadow:0 2px 6px rgba(0,0,0,.15);z-index:10;flex-wrap:wrap;flex-shrink:0}
+  .toolbar h1{font-size:15px;margin:0;font-weight:600;letter-spacing:1px;white-space:nowrap}
+  .toolbar .spacer{flex:1}
+  .toolbar button{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);padding:5px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-family:inherit;transition:.15s;white-space:nowrap}
+  .toolbar button:hover{background:rgba(255,255,255,.28)}
+  .toolbar button.primary{background:#FFD966;color:var(--navy);border-color:#FFD966;font-weight:600}
+  .toolbar button.primary:hover{background:#FFCB2E}
+  .toolbar button.success{background:#4ECB71;color:#fff;border-color:#4ECB71;font-weight:600}
+  .toolbar button.success:hover{background:#3ba85d}
+  .toolbar .current-badge{background:rgba(255,255,255,.2);padding:4px 10px;border-radius:4px;font-size:11px;color:#fff;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .toolbar .autosave-info{font-size:11px;color:rgba(255,255,255,.6);white-space:nowrap}
+
+  .progress-bar-wrap{background:#1a4268;padding:4px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0}
+  .progress-track{flex:1;background:rgba(255,255,255,.2);border-radius:10px;height:6px;overflow:hidden}
+  .progress-fill{height:100%;background:linear-gradient(90deg,#FFD966,#FFC000);border-radius:10px;transition:width .4s}
+  .progress-text{font-size:11px;color:rgba(255,255,255,.8);white-space:nowrap;min-width:80px}
+
+  .content-grid{flex:1;display:grid;grid-template-columns:1fr 1fr;overflow:hidden;min-height:0}
+  @media (max-width:1100px){.content-grid{grid-template-columns:1fr}}
+
+  .mobile-tabs{display:none;background:#fff;border-bottom:2px solid var(--border);flex-shrink:0}
+  .mobile-tabs button{flex:1;padding:10px;border:none;background:none;font-size:13px;color:var(--muted);cursor:pointer;font-family:inherit;border-bottom:3px solid transparent;transition:.15s}
+  .mobile-tabs button.active{color:var(--navy);font-weight:600;border-bottom-color:var(--blue)}
+  @media (max-width:1100px){.mobile-tabs{display:flex}.panel.hidden{display:none}}
+
+  .panel{overflow-y:auto;min-height:0}
+  .form-panel{background:#fff;border-right:1px solid #D5DFE9;padding:20px 24px 60px}
+  .preview-panel{background:#EDF2F7;padding:20px 24px 60px}
+
+  /* ═══ 表單 ═══ */
+  .section{margin-bottom:14px;border:1px solid #E1E8EF;border-radius:8px;overflow:hidden;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.03)}
+  .section-header{background:var(--blue);color:#fff;padding:9px 14px;font-size:14px;font-weight:600;letter-spacing:.5px;display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none}
+  .section-header:hover{background:#3580c0}
+  .section-header.star{background:linear-gradient(90deg,var(--blue) 0%,#5B9BD5 100%)}
+  .section-header .badge{background:#FFD966;color:var(--navy);font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600}
+  .section-header .collapse-icon{margin-left:auto;font-size:12px;transition:transform .2s}
+  .section-header.collapsed .collapse-icon{transform:rotate(-90deg)}
+  .section-body{padding:14px}
+  .section-body.collapsed{display:none}
+
+  .section-dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.35);flex-shrink:0;transition:background .3s}
+  .section-dot.done{background:#4ECB71}
+  .section-dot.partial{background:#FFD966}
+
+  .row{margin-bottom:12px}
+  .row:last-child{margin-bottom:0}
+  .row.two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .row.three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+  @media (max-width:640px){.row.two-col,.row.three-col{grid-template-columns:1fr}}
+
+  label{display:block;font-size:13px;font-weight:600;color:var(--navy);margin-bottom:5px}
+  label .req{color:var(--red);margin-left:3px}
+  label .hint{color:var(--muted);font-weight:400;font-size:11px;margin-left:6px}
+
+  input[type=text],input[type=date],input[type=number],textarea,select{
+    width:100%;border:1px solid #CDD9E4;border-radius:4px;padding:8px 10px;
+    font-size:13px;font-family:inherit;color:var(--text);background:#fff;transition:.15s
+  }
+  input:focus,textarea:focus,select:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 2px rgba(46,117,182,.15)}
+  textarea{resize:vertical;min-height:60px;line-height:1.5}
+  .field-error input,.field-error textarea,.field-error select{border-color:var(--red)!important;background:#fff5f5!important}
+
+  .star-field label{color:var(--star-label);background:var(--star-bg);padding:4px 8px;border-radius:3px;display:inline-block}
+  .char-counter{font-size:11px;color:var(--muted);text-align:right;margin-top:3px}
+  .char-counter.warn{color:#D06000}
+
+  .checkbox-group{display:flex;flex-wrap:wrap;gap:10px 14px;padding:4px 0}
+  .checkbox-group label{display:inline-flex;align-items:center;gap:6px;font-weight:400;font-size:13px;color:var(--text);margin:0;cursor:pointer;background:none}
+  .checkbox-group input[type=checkbox]{width:16px;height:16px;accent-color:var(--blue);cursor:pointer;margin:0}
+  .radio-group{display:flex;flex-wrap:wrap;gap:14px}
+  .radio-group label{display:inline-flex;align-items:center;gap:6px;font-weight:400;font-size:13px;color:var(--text);margin:0;cursor:pointer;background:none}
+  .radio-group input[type=radio]{accent-color:var(--blue);cursor:pointer}
+  .budget-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .budget-row div{display:flex;flex-direction:column;gap:3px}
+  .budget-row span{font-size:11px;color:var(--muted)}
+  @media (max-width:640px){.budget-row{grid-template-columns:1fr 1fr}}
+  .other-inline{display:flex;align-items:center;gap:6px;flex:1;min-width:200px}
+  .other-inline input{padding:4px 8px;font-size:12px}
+  .warning-box{background:var(--orange);border-left:3px solid var(--red);padding:8px 12px;font-size:12px;color:var(--red);margin-bottom:8px;border-radius:0 4px 4px 0}
+
+  /* ═══ 預覽 ═══ */
+  .preview-doc{background:#fff;box-shadow:0 4px 16px rgba(0,0,0,.08);border-radius:6px;overflow:hidden}
+  .preview-title{background:var(--navy);color:#fff;text-align:center;padding:16px}
+  .preview-title h2{margin:0;font-size:22px;letter-spacing:3px}
+  .preview-title .sub{color:var(--light-blue);font-size:11px;margin-top:3px}
+  .preview-doc table{width:100%;border-collapse:collapse;table-layout:fixed}
+  .preview-doc td{border:1px solid var(--border);padding:8px 10px;font-size:12px;vertical-align:top;word-wrap:break-word}
+  .preview-section-head td{background:var(--blue);color:#fff;font-weight:600;padding:8px 12px;letter-spacing:.5px}
+  .preview-section-head.star-head td{background:linear-gradient(90deg,var(--blue) 0%,#5B9BD5 100%)}
+  .preview-section-head td .warn-badge{background:#FFD966;color:var(--navy);padding:1px 8px;border-radius:8px;font-size:10px;margin-left:8px;font-weight:600}
+  .lbl{background:var(--label-bg);color:var(--navy);font-weight:600;text-align:center;width:22%}
+  .star-lbl{background:var(--star-bg);color:var(--star-label);font-weight:600}
+  .val{background:#fff}
+  .val.empty{color:var(--muted);font-style:italic;font-size:11px}
+  .warn-cell{background:var(--orange)}
+  .warn-cell .warn{color:var(--red);font-weight:600;font-size:11px;margin-bottom:4px}
+  .success-cell{background:var(--green)}
+  .preview-doc h3{color:var(--navy);font-size:15px;margin:18px 12px 6px;font-weight:600}
+  .ref-section{padding:12px;background:#FAFBFC;border-top:1px solid #E1E8EF;margin-top:10px}
+  .ref-section h4{color:var(--navy);font-size:12px;margin:0 0 8px}
+  .ref-section table td{font-size:11px;padding:5px 8px}
+  .ref-section .lbl{background:var(--label-bg)}
+  .ref-note{color:var(--star-label);font-size:11px;margin-top:6px}
+
+  /* Print */
+  @media print{
+    body{background:#fff;overflow:visible;height:auto}
+    .sidebar,.toolbar,.form-panel,.progress-bar-wrap,.mobile-tabs{display:none!important}
+    .app,.main,.content-grid{display:block;height:auto;overflow:visible}
+    .preview-panel{padding:0;background:#fff;height:auto;overflow:visible}
+    .preview-doc{box-shadow:none;border-radius:0}
+    @page{size:A4;margin:1cm}
+  }
+
+  /* Toast + Modal */
+  .toast{position:fixed;top:60px;right:24px;background:var(--navy);color:#fff;padding:10px 18px;border-radius:6px;font-size:13px;box-shadow:0 4px 12px rgba(0,0,0,.2);opacity:0;transition:.3s;pointer-events:none;z-index:100}
+  .toast.show{opacity:1}
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:none;align-items:center;justify-content:center}
+  .modal-overlay.open{display:flex}
+  .modal{background:#fff;border-radius:8px;padding:24px;max-width:400px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.2)}
+  .modal h3{margin:0 0 12px;color:var(--red);font-size:16px}
+  .modal ul{margin:0 0 16px;padding-left:20px;font-size:13px;color:var(--text)}
+  .modal ul li{margin-bottom:4px}
+  .modal-actions{display:flex;gap:10px;justify-content:flex-end}
+  .modal-actions button{padding:8px 16px;border-radius:4px;cursor:pointer;font-size:13px;font-family:inherit;border:none}
+  .modal-actions .btn-cancel{background:#fff;border:1px solid #ccc;color:var(--text)}
+  .modal-actions .btn-confirm{background:var(--navy);color:#fff}
+
+  /* Login overlay */
+  .login-overlay{position:fixed;inset:0;background:linear-gradient(135deg,var(--navy) 0%,var(--navy-dark) 100%);z-index:500;display:flex;align-items:center;justify-content:center}
+  .login-box{background:#fff;border-radius:12px;padding:36px 40px;width:360px;box-shadow:0 8px 40px rgba(0,0,0,.3)}
+  .login-box h2{margin:0 0 4px;color:var(--navy);font-size:20px;letter-spacing:1px}
+  .login-box .sub{color:var(--muted);font-size:12px;margin-bottom:22px}
+  .role-tabs{display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid #E1E8EF}
+  .role-tabs button{flex:1;background:none;border:none;padding:10px;font-size:13px;color:var(--muted);cursor:pointer;font-family:inherit;border-bottom:3px solid transparent;margin-bottom:-2px;transition:.15s}
+  .role-tabs button.active{color:var(--navy);font-weight:700;border-bottom-color:var(--blue)}
+  .login-box label{display:block;font-size:12px;color:var(--navy);font-weight:600;margin-bottom:6px}
+  .login-box input,.login-box select{width:100%;padding:10px 12px;border:1px solid #CDD9E4;border-radius:6px;font-size:14px;font-family:inherit;margin-bottom:14px;background:#fff}
+  .login-box input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(46,117,182,.15)}
+  .login-box .btn-login{width:100%;background:var(--navy);color:#fff;border:none;padding:11px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:.15s}
+  .login-box .btn-login:hover{background:#163d63}
+  .login-error{color:var(--red);font-size:12px;margin-top:-8px;margin-bottom:10px;min-height:16px}
+  .login-hint{font-size:11px;color:var(--muted);margin-top:14px;line-height:1.6;text-align:center}
+
+  /* Role badge in toolbar */
+  .role-badge{background:rgba(255,255,255,.2);padding:3px 8px;border-radius:10px;font-size:11px;color:#fff;font-weight:600}
+  .role-badge.mgr{background:#FFD966;color:var(--navy)}
+
+  /* 鎖定區塊樣式（依角色由 JS 加 disabled，這裡給視覺） */
+  .section-body input:disabled,
+  .section-body textarea:disabled,
+  .section-body select:disabled{
+    background:#F5F7FA!important;color:#5a6a7e;cursor:not-allowed;
+  }
+  .section.locked .section-header::after{
+    content:"🔒 唯讀"; margin-left:auto; margin-right:8px; font-size:10px; opacity:.8;
+  }
+  .section.locked .section-header .collapse-icon{margin-left:0}
+  .readonly-mode #btn-new,.readonly-mode #btn-save-as,.readonly-mode #btn-submit,.readonly-mode #btn-delete-hint{display:none}
+
+  /* Sync indicator */
+  .sync-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#4ECB71;margin-right:4px;animation:pulse 2s infinite}
+  .sync-dot.offline{background:#E06060;animation:none}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+</style>
+</head>
+<body>
+
+<!-- ═══ 登入畫面 ═══ -->
+<div class="login-overlay" id="login-overlay">
+  <div class="login-box">
+    <h2>📋 專案需求說明表</h2>
+    <div class="sub">請先登入以繼續</div>
+    <div class="role-tabs">
+      <button class="active" onclick="setLoginRole('sales')" id="role-tab-sales">👤 業務</button>
+      <button onclick="setLoginRole('manager')" id="role-tab-manager">⚑ 主管</button>
+    </div>
+    <label id="login-name-label">您的姓名</label>
+    <select id="login-name-sales">
+      <option value="">請選擇…</option>
+      <option value="王鳳儀">王鳳儀</option>
+      <option value="胡祖豪">胡祖豪</option>
+      <option value="陳鉅業">陳鉅業</option>
+      <option value="黃素盈">黃素盈</option>
+      <option value="鄭順德">鄭順德</option>
+    </select>
+    <input type="text" id="login-name-mgr" value="郭燕蓉" readonly style="display:none;background:#F5F7FA;color:#5a6a7e">
+    <label>密碼</label>
+    <input type="password" id="login-pin" placeholder="請輸入密碼" onkeydown="if(event.key==='Enter')doLogin()">
+    <div class="login-error" id="login-error"></div>
+    <button class="btn-login" onclick="doLogin()">登入</button>
+  </div>
+</div>
+
+<div class="app" id="main-app" style="display:none">
+
+  <!-- ═══ 欄一：紀錄側欄 ═══ -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h2>專案需求紀錄</h2>
+      <button class="btn-new" onclick="newRecord()"><span>＋</span> 新增專案需求表</button>
+      <input class="records-search" id="records-search" type="text" placeholder="搜尋客戶或專案…">
+      <div class="btn-io-row">
+        <button class="btn-io" onclick="exportAll()">⬇ 匯出全部</button>
+        <button class="btn-io" onclick="importJSON()">⬆ 匯入</button>
+      </div>
+      <input type="file" id="json-file-input" accept=".json" style="display:none">
+    </div>
+    <div class="sidebar-body" id="records-list">
+      <div class="records-empty">尚無紀錄<br>填寫後點「儲存」建立第一份</div>
+    </div>
+  </div>
+
+  <!-- ═══ 欄二＋欄三：主區 ═══ -->
+  <div class="main">
+    <div class="toolbar">
+      <h1>📋 專案需求說明表</h1>
+      <span class="role-badge" id="role-badge">👤 業務</span>
+      <span class="current-badge" id="current-badge">（新單 · 未儲存）</span>
+      <div class="spacer"></div>
+      <span class="autosave-info" id="autosave-info"><span class="sync-dot" id="sync-dot"></span>雲端已同步</span>
+      <button class="success" onclick="saveRecord()" id="btn-save">💾 儲存</button>
+      <button onclick="saveAsNew()" id="btn-save-as">📄 另存新檔</button>
+      <button onclick="submitForApproval()" id="btn-submit" style="background:#FFD966;color:var(--navy);border-color:#FFD966;font-weight:600">📤 送審</button>
+      <button onclick="exportCurrent()">📥 匯出</button>
+      <button class="primary" onclick="printWithValidation()">🖨 列印 / PDF</button>
+      <button onclick="changeManagerPin()" id="btn-change-pin" style="display:none" title="變更主管密碼">🔑 改密碼</button>
+      <button onclick="logout()" title="登出">🚪</button>
+    </div>
+
+    <div class="progress-bar-wrap">
+      <div class="progress-track"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+      <div class="progress-text" id="progress-text">填寫進度 0%</div>
+    </div>
+
+    <div class="mobile-tabs">
+      <button class="active" onclick="switchTab('form')">📝 填寫表單</button>
+      <button onclick="switchTab('preview')">👁 預覽文件</button>
+    </div>
+
+    <div class="content-grid">
+
+      <!-- 表單 -->
+      <div class="panel form-panel" id="panel-form">
+
+        <div class="section" data-section="A">
+          <div class="section-header" onclick="toggleSection(this)">
+            <span class="section-dot" id="dot-A"></span>
+            A　基本資訊
+            <span class="collapse-icon">▼</span>
+          </div>
+          <div class="section-body">
+            <div class="row">
+              <label>產品類型</label>
+              <div class="checkbox-group">
+                <label><input type="checkbox" data-key="productType" value="平面"> 平面</label>
+                <label><input type="checkbox" data-key="productType" value="數位"> 數位</label>
+                <label><input type="checkbox" data-key="productType" value="活動"> 活動</label>
+              </div>
+            </div>
+            <div class="row two-col">
+              <div><label>專案申請人<span class="req">*</span></label><input type="text" data-key="applicant" placeholder="姓名 / 單位"></div>
+              <div><label>客戶名稱<span class="req">*</span></label><input type="text" data-key="clientName" placeholder="公司全名"></div>
+            </div>
+            <div class="row two-col">
+              <div><label>提案申請日期<span class="req">*</span></label><input type="date" data-key="applyDate"></div>
+              <div><label>提案交付日期 <span class="hint">交付客戶日期</span></label><input type="date" data-key="deliveryDate"></div>
+            </div>
+            <div class="row two-col">
+              <div><label>電訪 / 拜訪日期</label><input type="date" data-key="visitDate"></div>
+              <div><label>預計活動舉辦時間</label><input type="text" data-key="eventDate" placeholder="例：2026/06/15"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section" data-section="B">
+          <div class="section-header" onclick="toggleSection(this)">
+            <span class="section-dot" id="dot-B"></span>
+            B　提案對象與預算
+            <span class="collapse-icon">▼</span>
+          </div>
+          <div class="section-body">
+            <div class="row">
+              <label>本次提案對象</label>
+              <div class="radio-group">
+                <label><input type="radio" name="targetType" data-key="targetType" value="直客"> 直客</label>
+                <label><input type="radio" name="targetType" data-key="targetType" value="與媒代提案"> 與媒代提案</label>
+                <div class="other-inline">
+                  <span style="font-size:12px;color:var(--muted)">媒代名稱：</span>
+                  <input type="text" data-key="agencyName" placeholder="若選媒代請填">
+                </div>
+              </div>
+            </div>
+            <div class="row two-col">
+              <div><label>客戶部門 / 窗口</label><input type="text" data-key="clientContact" placeholder="部門名稱及聯絡人"></div>
+              <div><label>客戶決策者</label><input type="text" data-key="decisionMaker" placeholder="關鍵決策人姓名 / 職稱"></div>
+            </div>
+            <div class="row">
+              <label>本案預算（未稅）<span class="req">*</span> <span class="hint">NT$</span></label>
+              <input type="number" data-key="totalBudget" placeholder="總預算">
+            </div>
+            <div class="row">
+              <label>預算分配</label>
+              <div class="budget-row">
+                <div><span>平面 NT$</span><input type="number" data-key="budgetPrint" placeholder="0"></div>
+                <div><span>數位 NT$</span><input type="number" data-key="budgetDigital" placeholder="0"></div>
+                <div><span>活動 NT$</span><input type="number" data-key="budgetEvent" placeholder="0"></div>
+                <div><span>其他 NT$</span><input type="number" data-key="budgetOther" placeholder="0"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section" data-section="C">
+          <div class="section-header" onclick="toggleSection(this)">
+            <span class="section-dot" id="dot-C"></span>
+            C　專案資訊
+            <span class="collapse-icon">▼</span>
+          </div>
+          <div class="section-body">
+            <div class="row two-col">
+              <div><label>專案名稱<span class="req">*</span></label><input type="text" data-key="projectName" placeholder="本次提案專案名稱"></div>
+              <div><label>預計走期（天）</label><input type="number" data-key="projectDays" placeholder="執行天數"></div>
+            </div>
+            <div class="row">
+              <label>提案產品 / 服務</label>
+              <div class="checkbox-group">
+                <label><input type="checkbox" data-key="services" value="論壇活動"> 論壇活動</label>
+                <label><input type="checkbox" data-key="services" value="活動招募"> 活動招募</label>
+                <label><input type="checkbox" data-key="services" value="數位廣編"> 數位廣編</label>
+                <label><input type="checkbox" data-key="services" value="數位廣告投放"> 數位廣告投放</label>
+                <div class="other-inline">
+                  <label style="font-weight:400"><input type="checkbox" data-key="servicesOtherCheck" value="1"> 其他：</label>
+                  <input type="text" data-key="servicesOther" placeholder="請說明">
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <label>專案目的</label>
+              <div class="checkbox-group">
+                <label><input type="checkbox" data-key="purposes" value="品牌宣傳"> 品牌宣傳</label>
+                <label><input type="checkbox" data-key="purposes" value="增加使用者"> 增加使用者</label>
+                <div class="other-inline">
+                  <label style="font-weight:400"><input type="checkbox" data-key="purposesOtherCheck" value="1"> 其他：</label>
+                  <input type="text" data-key="purposesOther" placeholder="請說明">
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <label>專案目標族群描述</label>
+              <textarea data-key="audience" placeholder="描述目標受眾的年齡、職業、興趣等特徵" oninput="updateCharCount(this,200)"></textarea>
+              <div class="char-counter" id="cc-audience">0 / 200</div>
+            </div>
+            <div class="row">
+              <label>主題方向建議 <span class="hint">若業務有想法，或有相關資料及新聞可附參考連結</span></label>
+              <textarea data-key="theme" placeholder="主題方向 / 參考連結"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="section" data-section="D">
+          <div class="section-header star" onclick="toggleSection(this)">
+            <span class="section-dot" id="dot-D"></span>
+            D　客戶需求探詢
+            <span class="badge">⚑ 業務主管須審核</span>
+            <span class="collapse-icon">▼</span>
+          </div>
+          <div class="section-body">
+            <div class="row star-field">
+              <label>★ 客戶情境與痛點描述<span class="req">*</span></label>
+              <textarea data-key="painPoint" placeholder="描述客戶目前面臨的挑戰與背景；議程設計／議題設計方向" oninput="updateCharCount(this,300)"></textarea>
+              <div class="char-counter" id="cc-painPoint">0 / 300</div>
+            </div>
+            <div class="row star-field">
+              <label>★ 產品特色與優勢 / 主要競爭者</label>
+              <textarea data-key="productStrength" placeholder="客戶產品的核心差異化，以及主要競品分析" oninput="updateCharCount(this,300)"></textarea>
+              <div class="char-counter" id="cc-productStrength">0 / 300</div>
+            </div>
+            <div class="row star-field">
+              <label>★ 顧客需求與隱藏需求 / 期望我們完成的</label>
+              <textarea data-key="hiddenNeeds" placeholder="顯性需求 vs. 潛在期望，客戶希望達成什麼？" oninput="updateCharCount(this,300)"></textarea>
+              <div class="char-counter" id="cc-hiddenNeeds">0 / 300</div>
+            </div>
+            <div class="row star-field">
+              <label>★ 客戶認可或期望的創意或做法？最在乎的關鍵字？</label>
+              <textarea data-key="keywords" placeholder="已有方向或關鍵詞請列出"></textarea>
+            </div>
+            <div class="row star-field">
+              <label>★ 客戶最在意的 KPI / 如何衡量成功？</label>
+              <textarea data-key="kpi" placeholder="例：曝光數、報名人數、到場率、品牌聲量等"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="section" data-section="E">
+          <div class="section-header" onclick="toggleSection(this)">
+            <span class="section-dot" id="dot-E"></span>
+            E　競爭資訊
+            <span class="collapse-icon">▼</span>
+          </div>
+          <div class="section-body">
+            <div class="row two-col">
+              <div><label>提案競爭者（單位）</label><input type="text" data-key="competitor" placeholder="無請填「無（請保密）」"></div>
+              <div><label>客戶評價</label><input type="text" data-key="competitorReview" placeholder="NA"></div>
+            </div>
+            <div class="row">
+              <label>合作方式說明</label>
+              <textarea data-key="collaboration" placeholder="不限，請說明"></textarea>
+            </div>
+            <div class="row two-col">
+              <div>
+                <label>業務評估成案機率</label>
+                <div class="radio-group">
+                  <label><input type="radio" name="winRate" data-key="winRate" value="高（>70%）"> 高</label>
+                  <label><input type="radio" name="winRate" data-key="winRate" value="中（40-70%）"> 中</label>
+                  <label><input type="radio" name="winRate" data-key="winRate" value="低（<40%）"> 低</label>
+                </div>
+              </div>
+              <div>
+                <label>遠見可協助成案關鍵</label>
+                <input type="text" data-key="advantage" placeholder="說明遠見的核心優勢">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section" data-section="F">
+          <div class="section-header" onclick="toggleSection(this)">
+            <span class="section-dot" id="dot-F"></span>
+            F　特殊需求與其他
+            <span class="collapse-icon">▼</span>
+          </div>
+          <div class="section-body">
+            <div class="row">
+              <label>結案報告特殊需求</label>
+              <div class="warning-box">⚠ 若未填寫，企畫將依標準結案報告格式提供</div>
+              <textarea data-key="reportRequirement" placeholder="特殊格式、數據呈現需求…"></textarea>
+            </div>
+            <div class="row">
+              <label>其他提醒事項</label>
+              <textarea data-key="notes" placeholder="任何補充說明"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="section" data-section="G">
+          <div class="section-header" onclick="toggleSection(this)">
+            <span class="section-dot" id="dot-G"></span>
+            ✅ 專案需求回覆（企劃主管填寫）
+            <span class="collapse-icon">▼</span>
+          </div>
+          <div class="section-body">
+            <div class="row">
+              <label>執行方式</label>
+              <div class="radio-group">
+                <label><input type="radio" name="execType" data-key="execType" value="內部執行"> 內部執行</label>
+                <label><input type="radio" name="execType" data-key="execType" value="外包執行"> 外包執行</label>
+                <label><input type="radio" name="execType" data-key="execType" value="不執行"> 不執行</label>
+              </div>
+            </div>
+            <div class="row two-col">
+              <div><label>活動主責企畫 <span class="hint">主管指派</span></label>
+                <select data-key="eventPM">
+                  <option value="">（未指派）</option>
+                  <option value="劉國宏">劉國宏</option>
+                  <option value="郭大華">郭大華</option>
+                  <option value="許育瑋">許育瑋</option>
+                  <option value="盧昀葳">盧昀葳</option>
+                </select>
+              </div>
+              <div><label>數位主責企畫 <span class="hint">主管指派</span></label>
+                <select data-key="digitalPM">
+                  <option value="">（未指派）</option>
+                  <option value="劉國宏">劉國宏</option>
+                  <option value="郭大華">郭大華</option>
+                  <option value="許育瑋">許育瑋</option>
+                  <option value="盧昀葳">盧昀葳</option>
+                </select>
+              </div>
+            </div>
+            <div class="row">
+              <label>決定日期</label>
+              <input type="date" data-key="decisionDate">
+            </div>
+          </div>
+        </div>
+
+        <div class="section" data-section="I">
+          <div class="section-header" style="background:linear-gradient(90deg,#7F6000 0%,#B08810 100%)" onclick="toggleSection(this)">
+            <span class="section-dot" id="dot-I"></span>
+            ⚑ 主管簽核區
+            <span class="badge" id="status-badge">草稿</span>
+            <span class="collapse-icon">▼</span>
+          </div>
+          <div class="section-body">
+            <div class="row">
+              <label>簽核狀態</label>
+              <div class="radio-group">
+                <label><input type="radio" name="approvalStatus" data-key="approvalStatus" value="draft"> 草稿</label>
+                <label><input type="radio" name="approvalStatus" data-key="approvalStatus" value="pending"> 🟡 待審</label>
+                <label><input type="radio" name="approvalStatus" data-key="approvalStatus" value="approved"> 🟢 已核可</label>
+                <label><input type="radio" name="approvalStatus" data-key="approvalStatus" value="rejected"> 🔴 退件</label>
+              </div>
+            </div>
+            <div class="row two-col">
+              <div><label>核准主管</label><input type="text" data-key="approverName" placeholder="主管姓名 / 職稱"></div>
+              <div><label>簽核日期</label><input type="date" data-key="approvalDate"></div>
+            </div>
+            <div class="row">
+              <label>主管意見 / 退件原因</label>
+              <textarea data-key="approvalComment" placeholder="主管審核後填寫意見；若退件請說明原因與修改方向"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="section" data-section="H">
+          <div class="section-header" onclick="toggleSection(this)">
+            <span class="section-dot" id="dot-H"></span>
+            📊 專案結果追蹤（業務填寫）
+            <span class="collapse-icon">▼</span>
+          </div>
+          <div class="section-body">
+            <div class="row two-col">
+              <div>
+                <label>提案結果</label>
+                <div class="radio-group">
+                  <label><input type="radio" name="outcome" data-key="outcome" value="成功"> 成功</label>
+                  <label><input type="radio" name="outcome" data-key="outcome" value="失敗"> 失敗</label>
+                </div>
+              </div>
+              <div><label>合作金額 <span class="hint">NT$</span></label><input type="number" data-key="finalAmount" placeholder="若成功請填"></div>
+            </div>
+            <div class="row">
+              <label>原因分析</label>
+              <textarea data-key="outcomeAnalysis" placeholder="請業務填寫成功 / 失敗原因"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 預覽 -->
+      <div class="panel preview-panel" id="panel-preview">
+        <div class="preview-doc" id="preview">
+          <div class="preview-title">
+            <h2>專案需求說明表</h2>
+            <div class="sub">Project Brief Form · 2026</div>
+          </div>
+
+          <table>
+            <colgroup><col style="width:22%"><col style="width:28%"><col style="width:22%"><col style="width:28%"></colgroup>
+            <tr class="preview-section-head"><td colspan="4">A　基本資訊　Basic Information</td></tr>
+            <tr><td class="lbl">產品類型</td><td colspan="3" class="val" id="p-productType">—</td></tr>
+            <tr><td class="lbl">專案申請人</td><td class="val" id="p-applicant">—</td>
+                <td class="lbl">客戶名稱</td><td class="val" id="p-clientName">—</td></tr>
+            <tr><td class="lbl">提案申請日期</td><td class="val" id="p-applyDate">—</td>
+                <td class="lbl">提案交付日期</td><td class="val" id="p-deliveryDate">—</td></tr>
+            <tr><td class="lbl">電訪 / 拜訪日期</td><td class="val" id="p-visitDate">—</td>
+                <td class="lbl">預計活動舉辦時間</td><td class="val" id="p-eventDate">—</td></tr>
+
+            <tr class="preview-section-head"><td colspan="4">B　提案對象與預算　Proposal & Budget</td></tr>
+            <tr><td class="lbl">本次提案對象</td><td colspan="3" class="val" id="p-target">—</td></tr>
+            <tr><td class="lbl">客戶部門 / 窗口</td><td class="val" id="p-clientContact">—</td>
+                <td class="lbl">客戶決策者</td><td class="val" id="p-decisionMaker">—</td></tr>
+            <tr><td class="lbl">本案預算（未稅）</td><td colspan="3" class="val" id="p-totalBudget">—</td></tr>
+            <tr><td class="lbl">預算分配</td><td colspan="3" class="val" id="p-budgetBreakdown">—</td></tr>
+
+            <tr class="preview-section-head"><td colspan="4">C　專案資訊　Project Information</td></tr>
+            <tr><td class="lbl">專案名稱</td><td class="val" id="p-projectName">—</td>
+                <td class="lbl">預計走期（天）</td><td class="val" id="p-projectDays">—</td></tr>
+            <tr><td class="lbl">提案產品 / 服務</td><td colspan="3" class="val" id="p-services">—</td></tr>
+            <tr><td class="lbl">專案目的</td><td colspan="3" class="val" id="p-purposes">—</td></tr>
+            <tr><td class="lbl">目標族群描述</td><td colspan="3" class="val" id="p-audience">—</td></tr>
+            <tr><td class="lbl">主題方向建議</td><td colspan="3" class="val" id="p-theme">—</td></tr>
+
+            <tr class="preview-section-head star-head"><td colspan="4">D　客戶需求探詢　Client Discovery <span class="warn-badge">⚑ 業務主管須審核</span></td></tr>
+            <tr><td class="star-lbl">★ 客戶情境與痛點</td><td colspan="3" class="val" id="p-painPoint">—</td></tr>
+            <tr><td class="star-lbl">★ 產品特色與競品</td><td colspan="3" class="val" id="p-productStrength">—</td></tr>
+            <tr><td class="star-lbl">★ 顧客需求 / 隱藏需求</td><td colspan="3" class="val" id="p-hiddenNeeds">—</td></tr>
+            <tr><td class="star-lbl">★ 期望創意 / 關鍵字</td><td colspan="3" class="val" id="p-keywords">—</td></tr>
+            <tr><td class="star-lbl">★ 最在意的 KPI</td><td colspan="3" class="val" id="p-kpi">—</td></tr>
+
+            <tr class="preview-section-head"><td colspan="4">E　競爭資訊　Competitive Info</td></tr>
+            <tr><td class="lbl">競爭單位</td><td class="val" id="p-competitor">—</td>
+                <td class="lbl">客戶評價</td><td class="val" id="p-competitorReview">—</td></tr>
+            <tr><td class="lbl">合作方式說明</td><td colspan="3" class="val" id="p-collaboration">—</td></tr>
+            <tr><td class="lbl">業務評估成案機率</td><td class="val" id="p-winRate">—</td>
+                <td class="lbl">遠見可協助成案關鍵</td><td class="val" id="p-advantage">—</td></tr>
+
+            <tr class="preview-section-head"><td colspan="4">F　特殊需求與其他　Special Requirements</td></tr>
+            <tr><td class="lbl">結案報告特殊需求</td><td colspan="3" class="warn-cell" id="p-reportRequirement"><div class="warn">⚠ 若未填寫，企畫將依標準結案報告格式提供</div><span class="empty">—</span></td></tr>
+            <tr><td class="lbl">其他提醒事項</td><td colspan="3" class="val" id="p-notes">—</td></tr>
+          </table>
+
+          <h3>【專案需求回覆】</h3>
+          <table>
+            <colgroup><col style="width:22%"><col style="width:28%"><col style="width:22%"><col style="width:28%"></colgroup>
+            <tr><td class="lbl">執行方式</td><td class="val" id="p-execType">—</td>
+                <td class="lbl">決定日期</td><td class="val" id="p-decisionDate">—</td></tr>
+            <tr><td class="lbl">活動主責企畫</td><td class="val" id="p-eventPM">—</td>
+                <td class="lbl">數位主責企畫</td><td class="val" id="p-digitalPM">—</td></tr>
+          </table>
+
+          <h3>⚑【主管簽核】</h3>
+          <table>
+            <colgroup><col style="width:22%"><col style="width:28%"><col style="width:22%"><col style="width:28%"></colgroup>
+            <tr><td class="lbl">簽核狀態</td><td class="val" id="p-approvalStatus">—</td>
+                <td class="lbl">核准主管</td><td class="val" id="p-approverName">—</td></tr>
+            <tr><td class="lbl">簽核日期</td><td class="val" id="p-approvalDate">—</td>
+                <td class="lbl">主管簽章</td><td class="val" style="height:50px" id="p-approvalSign">　</td></tr>
+            <tr><td class="lbl">主管意見</td><td colspan="3" class="val" id="p-approvalComment">—</td></tr>
+          </table>
+
+          <h3>【專案結果追蹤】</h3>
+          <table>
+            <colgroup><col style="width:22%"><col style="width:28%"><col style="width:22%"><col style="width:28%"></colgroup>
+            <tr><td class="lbl">提案結果</td><td class="success-cell" id="p-outcome">—</td>
+                <td class="lbl">合作金額</td><td class="val" id="p-finalAmount">—</td></tr>
+            <tr><td class="lbl">原因分析</td><td colspan="3" class="val" id="p-outcomeAnalysis">—</td></tr>
+          </table>
+
+          <div class="ref-section">
+            <h4>【補充參考：5W1H 需求探詢框架】</h4>
+            <table>
+              <colgroup><col style="width:22%"><col style="width:78%"></colgroup>
+              <tr><td class="lbl">When（何時）</td><td>什麼時候進行？上午 / 下午 / 晚上？</td></tr>
+              <tr><td class="lbl">Where（哪裡）</td><td>北中南東？飯店？會議中心？</td></tr>
+              <tr><td class="lbl">Who（誰）</td><td>TA？講師？貴賓？主持人？</td></tr>
+              <tr><td class="lbl">What（什麼）</td><td>要做些什麼專案內容？預算？</td></tr>
+              <tr><td class="lbl">Why（為何）</td><td>為什麼要做這些專案內容？目的？</td></tr>
+              <tr><td class="lbl">How（如何）</td><td>如何達成 KPI？</td></tr>
+            </table>
+            <div class="ref-note">★ 隱形的 KPI？客戶的額外期望？請在 D 區客戶需求探詢中詳述</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <h3>⚠ 必填欄位未完成</h3>
+    <p style="font-size:13px;margin:0 0 10px;color:var(--muted)">以下欄位尚未填寫，是否仍要列印？</p>
+    <ul id="modal-list"></ul>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">繼續填寫</button>
+      <button class="btn-confirm" onclick="doPrint()">仍要列印</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+
+// ═══ Firebase 設定（共用 tennis-court-nomo 專案，開新 node）═══
+const firebaseConfig = {
+  apiKey: "AIzaSyB0nqFFS6-MIuWAM0XDnURRnxg57JZF5Sc",
+  authDomain: "tennis-court-nomo.firebaseapp.com",
+  databaseURL: "https://tennis-court-nomo-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "tennis-court-nomo",
+  storageBucket: "tennis-court-nomo.firebasestorage.app",
+  messagingSenderId: "761622662336",
+  appId: "1:761622662336:web:proposal-brief"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const DB_ROOT = 'proposal-briefs';
+
+// ═══ EmailJS 送審通知設定（註冊 emailjs.com 後填入三個值即啟用）═══
+const EMAILJS_CONFIG = {
+  publicKey: '',           // EmailJS → Account → Public Key
+  serviceId: '',           // EmailJS → Email Services → Service ID
+  templateId: '',          // EmailJS → Email Templates → Template ID
+  managerEmail: ''         // 郭燕蓉主管的信箱
+};
+if(EMAILJS_CONFIG.publicKey && window.emailjs){
+  emailjs.init({ publicKey: EMAILJS_CONFIG.publicKey });
+}
+
+function sendApprovalEmail(d){
+  if(!EMAILJS_CONFIG.publicKey || !EMAILJS_CONFIG.serviceId || !EMAILJS_CONFIG.templateId){
+    return Promise.resolve('not-configured');
+  }
+  return emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.templateId, {
+    to_email: EMAILJS_CONFIG.managerEmail,
+    applicant: d.applicant || userName,
+    client_name: d.clientName || '（未填）',
+    project_name: d.projectName || '（未填）',
+    budget: d.totalBudget ? 'NT$ ' + Number(d.totalBudget).toLocaleString() : '（未填）',
+    pain_point: d.painPoint || '（未填）',
+    kpi: d.kpi || '（未填）',
+    tool_url: location.href.split('#')[0]
+  });
+}
+
+// PIN
+const SALES_PIN = '20905449';
+const DEFAULT_MANAGER_PIN = '20905449';
+const MANAGER_NAME = '郭燕蓉';
+let managerPin = DEFAULT_MANAGER_PIN;
+// 主管自訂密碼存雲端，開頁即讀取
+try{
+  firebase.database().ref('proposal-briefs-config/managerPin').on('value', s=>{
+    const v = s.val();
+    if(v) managerPin = String(v);
+  });
+} catch(e){}
+
+// Session state
+let userRole = null;      // 'sales' | 'manager'
+let userName = '';
+let loginRoleTmp = 'sales';
+
+const STORAGE_KEY = 'projectBrief_records_v2';
+const LEGACY_KEY = 'projectBriefDraft_v1';
+const SESSION_KEY = 'projectBrief_session';
+
+const REQUIRED_FIELDS = [
+  ['applicant','專案申請人'],
+  ['clientName','客戶名稱'],
+  ['applyDate','提案申請日期'],
+  ['totalBudget','本案預算'],
+  ['projectName','專案名稱'],
+  ['painPoint','★ 客戶情境與痛點描述'],
+];
+
+const SECTION_FIELDS = {
+  A:['applicant','clientName','applyDate'],
+  B:['targetType','totalBudget'],
+  C:['projectName','audience'],
+  D:['painPoint','productStrength','hiddenNeeds','keywords','kpi'],
+  E:['competitor','winRate'],
+  F:[],
+  G:['execType'],
+  H:['outcome'],
+  I:['approvalStatus'],
+};
+
+const STATUS_LABEL = {
+  draft:'草稿', pending:'🟡 待審', approved:'🟢 已核可', rejected:'🔴 退件'
+};
+
+let records = [];
+let currentId = null;
+let isUnsaved = false;
+let filterQuery = '';
+let collapsedGroups = new Set();
+
+// ═══ 工具 ═══
+function genId(){ return 'br_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+function escHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function fmtDate(v){
+  if(!v) return '';
+  const d = new Date(v);
+  if(isNaN(d)) return v;
+  return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+}
+function fmtMoney(v){
+  if(v===''||v==null) return '';
+  const n = Number(v);
+  if(isNaN(n)) return v;
+  return 'NT$ ' + n.toLocaleString();
+}
+function setCell(id, value, fallback='—'){
+  const el = document.getElementById(id);
+  if(!el) return;
+  if(value===''||value==null){ el.innerHTML=`<span class="empty">${fallback}</span>`; }
+  else { el.textContent = value; el.classList.remove('empty'); }
+}
+function showToast(msg){
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2000);
+}
+
+// ═══ 登入 ═══
+function setLoginRole(role){
+  loginRoleTmp = role;
+  document.getElementById('role-tab-sales').classList.toggle('active', role==='sales');
+  document.getElementById('role-tab-manager').classList.toggle('active', role==='manager');
+  document.getElementById('login-name-label').textContent = role==='manager' ? '主管姓名' : '業務姓名';
+  document.getElementById('login-name-sales').style.display = role==='manager' ? 'none' : 'block';
+  document.getElementById('login-name-mgr').style.display = role==='manager' ? 'block' : 'none';
+}
+
+function doLogin(){
+  const name = loginRoleTmp==='manager'
+    ? MANAGER_NAME
+    : document.getElementById('login-name-sales').value.trim();
+  const pin = document.getElementById('login-pin').value.trim();
+  const err = document.getElementById('login-error');
+  if(!name){ err.textContent='請選擇姓名'; return; }
+  const expected = loginRoleTmp==='manager' ? managerPin : SALES_PIN;
+  if(pin!==expected){ err.textContent='密碼錯誤'; return; }
+  userRole = loginRoleTmp;
+  userName = name;
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify({role:userRole, name:userName}));
+  err.textContent='';
+  showApp();
+}
+
+function changeManagerPin(){
+  const cur = prompt('請輸入目前的主管密碼：');
+  if(cur===null) return;
+  if(cur.trim()!==managerPin){ alert('❌ 密碼錯誤'); return; }
+  const next = prompt('請輸入新密碼（至少 4 碼）：');
+  if(next===null) return;
+  if(next.trim().length<4){ alert('❌ 新密碼至少 4 碼'); return; }
+  const confirm2 = prompt('請再輸入一次新密碼確認：');
+  if(confirm2===null) return;
+  if(next.trim()!==confirm2.trim()){ alert('❌ 兩次輸入不一致'); return; }
+  db.ref('proposal-briefs-config/managerPin').set(next.trim())
+    .then(()=>showToast('🔑 主管密碼已更新（雲端同步）'))
+    .catch(e=>alert('❌ 更新失敗：'+e.message));
+}
+
+function logout(){
+  if(!confirm('確定要登出嗎？')) return;
+  sessionStorage.removeItem(SESSION_KEY);
+  location.reload();
+}
+
+function showApp(){
+  document.getElementById('login-overlay').style.display='none';
+  document.getElementById('main-app').style.display='flex';
+  applyRoleUI();
+  initFirebaseSync();
+  migrateLegacyOnce();
+}
+
+function applyRoleUI(){
+  const isMgr = userRole==='manager';
+  document.body.classList.toggle('readonly-mode', isMgr);
+  const badge = document.getElementById('role-badge');
+  badge.textContent = isMgr ? '⚑ 主管' : '👤 業務';
+  badge.classList.toggle('mgr', isMgr);
+  document.querySelector('.btn-new').style.display = isMgr ? 'none' : 'block';
+  document.getElementById('btn-change-pin').style.display = isMgr ? 'inline-block' : 'none';
+  if(isMgr){
+    document.getElementById('records-search').placeholder = '搜尋業務、客戶或專案…';
+    // 主管填入自己名字到核准主管欄
+    const nameEl = document.querySelector('[data-key="approverName"]');
+    if(nameEl && !nameEl.value) nameEl.value = userName;
+  }
+  lockNonApprovalSections(isMgr);
+}
+
+// G（企劃回覆）與 I（簽核）為主管專屬區；其餘為業務區
+const MANAGER_SECTIONS = ['G','I'];
+function lockNonApprovalSections(){
+  const isMgr = userRole==='manager';
+  document.querySelectorAll('.section').forEach(sec=>{
+    const isMgrSection = MANAGER_SECTIONS.includes(sec.dataset.section);
+    const editable = isMgr ? isMgrSection : !isMgrSection;
+    sec.classList.toggle('locked', !editable);
+    sec.querySelectorAll('input, textarea, select').forEach(el=>{
+      if(editable){ el.removeAttribute('disabled'); }
+      else { el.setAttribute('disabled','disabled'); }
+    });
+  });
+}
+
+// ═══ Firebase 同步 ═══
+let dbRef = null;
+function initFirebaseSync(){
+  const dot = document.getElementById('sync-dot');
+  dbRef = db.ref(DB_ROOT);
+  dbRef.on('value', snap=>{
+    const val = snap.val() || {};
+    records = Object.values(val).sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
+    dot.classList.remove('offline');
+    renderRecordsList();
+    // 若當前打開的案子被別人更新，重新載入
+    if(currentId){
+      const rec = records.find(r=>r.id===currentId);
+      if(rec && !isUnsaved){
+        fillForm(rec.data||{});
+        render();
+        updateBadge();
+      }
+    }
+  }, err=>{
+    console.error('Firebase error', err);
+    dot.classList.add('offline');
+    document.getElementById('autosave-info').innerHTML = '<span class="sync-dot offline"></span>離線 · 使用本機';
+  });
+}
+
+function pushToFirebase(rec){
+  if(!dbRef) return;
+  return dbRef.child(rec.id).set(rec).catch(e=>{
+    showToast('❌ 雲端寫入失敗：'+e.message);
+  });
+}
+function deleteFromFirebase(id){
+  if(!dbRef) return;
+  return dbRef.child(id).remove().catch(e=>showToast('❌ 刪除失敗：'+e.message));
+}
+
+// 首次登入後把本機舊資料丟上雲端
+function migrateLegacyOnce(){
+  if(userRole!=='sales') return;
+  if(localStorage.getItem('projectBrief_migrated')==='1') return;
+  const local = [];
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw) local.push(...JSON.parse(raw));
+    const legacy = localStorage.getItem(LEGACY_KEY);
+    if(legacy){
+      const data = JSON.parse(legacy);
+      local.push({ id: genId(), clientName: data.clientName||'（無客戶名）', projectName: data.projectName||'', updatedAt: new Date().toISOString(), createdAt: new Date().toISOString(), data });
+    }
+  } catch(e){}
+  if(local.length===0){ localStorage.setItem('projectBrief_migrated','1'); return; }
+  if(!confirm(`偵測到本機有 ${local.length} 筆舊紀錄，要上傳到雲端嗎？（不上傳的話舊紀錄仍保留在本機）`)){
+    localStorage.setItem('projectBrief_migrated','1');
+    return;
+  }
+  Promise.all(local.map(r=>{
+    r.ownerName = r.ownerName || userName;
+    return pushToFirebase(r);
+  })).then(()=>{
+    localStorage.setItem('projectBrief_migrated','1');
+    showToast(`⬆ 已上傳 ${local.length} 筆到雲端`);
+  });
+}
+
+// 舊版存取（保留給離線 fallback）
+function loadStorage(){}
+function saveStorage(){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(records)); } catch(e){}
+}
+
+// ═══ 表單 State ═══
+function collect(){
+  const data = {};
+  document.querySelectorAll('[data-key]').forEach(el=>{
+    const k = el.dataset.key;
+    if(el.type==='checkbox'){
+      if(!data[k]) data[k]=[];
+      if(el.checked) data[k].push(el.value);
+    } else if(el.type==='radio'){
+      if(el.checked) data[k]=el.value;
+    } else {
+      data[k]=el.value;
+    }
+  });
+  return data;
+}
+
+function fillForm(data){
+  document.querySelectorAll('[data-key]').forEach(el=>{
+    const k = el.dataset.key;
+    const v = data[k];
+    if(el.type==='checkbox'){ el.checked = Array.isArray(v) && v.includes(el.value); }
+    else if(el.type==='radio'){ el.checked = v===el.value; }
+    else { el.value = v!=null ? v : ''; }
+  });
+  document.querySelectorAll('textarea[oninput]').forEach(el=>{
+    const m = el.getAttribute('oninput').match(/updateCharCount\(this,(\d+)\)/);
+    if(m) updateCharCount(el, parseInt(m[1]));
+  });
+}
+
+function clearFormFields(){
+  document.querySelectorAll('[data-key]').forEach(el=>{
+    if(el.type==='checkbox'||el.type==='radio') el.checked = false;
+    else el.value = '';
+  });
+  document.querySelectorAll('.field-error').forEach(el=>el.classList.remove('field-error'));
+  document.querySelectorAll('.char-counter').forEach(el=>{
+    const t = el.textContent.split('/')[1];
+    if(t) el.textContent = '0 /' + t;
+    el.classList.remove('warn');
+  });
+}
+
+// ═══ 紀錄 CRUD ═══
+function newRecord(){
+  if(isUnsaved && !confirm('目前有未儲存的變更，確定要開新的專案需求表嗎？')) return;
+  currentId = null;
+  isUnsaved = false;
+  clearFormFields();
+  // 預設今天
+  const today = new Date().toISOString().slice(0,10);
+  const applyEl = document.querySelector('[data-key="applyDate"]');
+  if(applyEl) applyEl.value = today;
+  render();
+  renderRecordsList();
+  updateBadge();
+  document.getElementById('panel-form').scrollTop = 0;
+}
+
+function saveRecord(){
+  const data = collect();
+  const clientName = data.clientName || '（無客戶名）';
+  const projectName = data.projectName || '（未命名專案）';
+  const now = new Date().toISOString();
+
+  let rec;
+  if(currentId){
+    const existing = records.find(r=>r.id===currentId);
+    rec = { ...(existing||{}), id: currentId, clientName, projectName, updatedAt: now, data, ownerName: existing?.ownerName || userName };
+    showToast('✅ 已儲存更新');
+  } else {
+    currentId = genId();
+    rec = { id: currentId, clientName, projectName, ownerName: userName, createdAt: now, updatedAt: now, data };
+    showToast('✅ 已建立新紀錄');
+  }
+  isUnsaved = false;
+  pushToFirebase(rec);
+  updateBadge();
+}
+
+function saveAsNew(){
+  const data = collect();
+  const clientName = data.clientName || '（無客戶名）';
+  const projectName = (data.projectName||'（未命名專案）') + '（副本）';
+  data.projectName = projectName;
+  const projEl = document.querySelector('[data-key="projectName"]');
+  if(projEl) projEl.value = projectName;
+  const now = new Date().toISOString();
+  currentId = genId();
+  const rec = { id: currentId, clientName, projectName, ownerName: userName, createdAt: now, updatedAt: now, data };
+  isUnsaved = false;
+  pushToFirebase(rec);
+  updateBadge();
+  render();
+  showToast('📄 已另存為新專案');
+}
+
+function submitForApproval(){
+  const d = collect();
+  const missing = getMissingRequired(d);
+  if(missing.length){
+    highlightErrors(missing);
+    alert('❌ 必填欄位尚未完成：\n\n' + missing.map(m=>'• '+m[1]).join('\n') + '\n\n請補齊後再送審。');
+    return;
+  }
+  if(!currentId){
+    if(!confirm('尚未儲存為紀錄，是否先儲存再送審？')) return;
+    saveRecord();
+  }
+  const statusEl = document.querySelector('[data-key="approvalStatus"][value="pending"]');
+  if(statusEl){ statusEl.checked = true; }
+  render();
+  scheduleAutoSave();
+  saveRecord();
+  const clientName = d.clientName || '';
+  const projectName = d.projectName || '';
+  const applicant = d.applicant || '';
+  const subject = encodeURIComponent(`【專案需求送審】${clientName} · ${projectName}`);
+  const body = encodeURIComponent(
+`您好：
+
+以下專案需求說明表送請核可，煩請撥空審閱。
+
+客戶：${clientName}
+專案：${projectName}
+申請人：${applicant}
+預算：${d.totalBudget ? 'NT$ '+Number(d.totalBudget).toLocaleString() : '（未填）'}
+
+★ 客戶痛點：
+${d.painPoint || '（未填）'}
+
+★ 主要 KPI：
+${d.kpi || '（未填）'}
+
+（本表附檔為 PDF；如需審閱完整簽核欄位，請在該表單「主管簽核區」填寫意見後回覆本信）
+
+謝謝！
+${applicant}`
+  );
+  // 自動寄信通知主管；未設定 EmailJS 時退回手動 mailto
+  sendApprovalEmail(d).then(res=>{
+    if(res==='not-configured'){
+      if(confirm('已切換為「🟡 待審」狀態並儲存。\n\n（尚未設定自動寄信）是否開啟 Email 通知主管？')){
+        window.location.href = `mailto:?subject=${subject}&body=${body}`;
+      }
+    } else {
+      showToast('📧 已自動寄出通知給主管');
+    }
+  }).catch(err=>{
+    console.error('EmailJS error', err);
+    if(confirm('❌ 自動寄信失敗，是否改用手動 Email？')){
+      window.location.href = `mailto:${EMAILJS_CONFIG.managerEmail}?subject=${subject}&body=${body}`;
+    }
+  });
+  showToast('📤 已送審');
+}
+
+function loadRecord(id){
+  if(isUnsaved && !confirm('目前有未儲存的變更，確定要切換嗎？')) return;
+  const rec = records.find(r=>r.id===id);
+  if(!rec) return;
+  currentId = id;
+  isUnsaved = false;
+  clearFormFields();
+  fillForm(rec.data||{});
+  // 主管：若簽核欄位為空，預帶入姓名和今天
+  if(userRole==='manager'){
+    const nameEl = document.querySelector('[data-key="approverName"]');
+    if(nameEl && !nameEl.value) nameEl.value = userName;
+    const dateEl = document.querySelector('[data-key="approvalDate"]');
+    if(dateEl && !dateEl.value) dateEl.value = new Date().toISOString().slice(0,10);
+  }
+  render();
+  updateBadge();
+  renderRecordsList();
+  document.getElementById('panel-form').scrollTop = 0;
+}
+
+function deleteRecord(id, ev){
+  ev.stopPropagation();
+  if(userRole==='manager'){ showToast('主管無法刪除紀錄'); return; }
+  const rec = records.find(r=>r.id===id);
+  if(!rec) return;
+  if(!confirm(`確定刪除「${rec.clientName} · ${rec.projectName}」？`)) return;
+  if(currentId===id){ currentId=null; newRecord(); }
+  deleteFromFirebase(id);
+  showToast('🗑 已刪除');
+}
+
+// ═══ 側欄渲染 ═══
+function renderRecordsList(){
+  const container = document.getElementById('records-list');
+  let list = records;
+  if(filterQuery){
+    const q = filterQuery.toLowerCase();
+    list = records.filter(r =>
+      (r.clientName||'').toLowerCase().includes(q) ||
+      (r.projectName||'').toLowerCase().includes(q) ||
+      (r.ownerName||'').toLowerCase().includes(q)
+    );
+  }
+  if(list.length===0){
+    const emptyMsg = userRole==='manager' ? '目前沒有待審案子' : '尚無紀錄<br>填寫後點「儲存」建立第一份';
+    container.innerHTML = `<div class="records-empty">${emptyMsg}</div>`;
+    return;
+  }
+  // 業務：依客戶分群；主管：依業務員分群
+  const groups = new Map();
+  list.forEach(r=>{
+    const k = userRole==='manager'
+      ? (r.ownerName || '（未知業務）')
+      : (r.clientName || '（無客戶名）');
+    if(!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(r);
+  });
+
+  let html = '';
+  groups.forEach((recs, clientName)=>{
+    const isCollapsed = collapsedGroups.has(clientName);
+    const itemsHtml = recs.map(rec=>{
+      const date = rec.updatedAt ? rec.updatedAt.slice(0,10) : '';
+      const active = rec.id===currentId ? ' active' : '';
+      const status = rec.data?.approvalStatus || 'draft';
+      const statusLabel = { draft:'草稿', pending:'待審', approved:'已核可', rejected:'退件' }[status];
+      return `
+        <div class="record-item${active}" onclick="loadRecord('${escHtml(rec.id)}')">
+          <button class="record-delete" onclick="deleteRecord('${escHtml(rec.id)}',event)" title="刪除">✕</button>
+          <div class="record-item-title">${escHtml(rec.projectName||'（未命名）')}</div>
+          <div class="record-item-meta"><span class="record-status ${status}">${statusLabel}</span>${escHtml(date)}${userRole==='manager' ? (rec.clientName?' · '+escHtml(rec.clientName):'') : (rec.ownerName?' · '+escHtml(rec.ownerName):'')}</div>
+        </div>`;
+    }).join('');
+    html += `
+      <div class="record-group-header" onclick="toggleGroup('${escHtml(clientName)}')">
+        <span class="record-group-arrow${isCollapsed?' collapsed':''}">▼</span>
+        <span>${escHtml(clientName)}</span>
+        <span class="record-group-count">${recs.length}</span>
+      </div>
+      <div class="record-group-items${isCollapsed?' collapsed':''}">${itemsHtml}</div>
+    `;
+  });
+  container.innerHTML = html;
+}
+
+function toggleGroup(name){
+  if(collapsedGroups.has(name)) collapsedGroups.delete(name);
+  else collapsedGroups.add(name);
+  renderRecordsList();
+}
+
+function updateBadge(){
+  const b = document.getElementById('current-badge');
+  if(!currentId){ b.textContent = '（新單 · 未儲存）'; return; }
+  const rec = records.find(r=>r.id===currentId);
+  if(!rec){ b.textContent = '（新單）'; return; }
+  b.textContent = `${rec.clientName} · ${rec.projectName}`;
+}
+
+// ═══ Import/Export ═══
+function exportCurrent(){
+  const data = collect();
+  const filename = `專案需求_${data.clientName||'draft'}_${new Date().toISOString().slice(0,10)}.json`;
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('📥 已匯出目前專案');
+}
+
+function exportAll(){
+  if(records.length===0){ showToast('沒有紀錄可匯出'); return; }
+  const filename = `專案需求_全部備份_${new Date().toISOString().slice(0,10)}.json`;
+  const blob = new Blob([JSON.stringify({version:2, records}, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast(`⬇ 已匯出 ${records.length} 筆紀錄`);
+}
+
+function importJSON(){ document.getElementById('json-file-input').click(); }
+
+document.getElementById('json-file-input').addEventListener('change', evt=>{
+  const file = evt.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e=>{
+    try{
+      const parsed = JSON.parse(e.target.result);
+      // 判斷是全部備份還是單一 record
+      if(parsed && parsed.version===2 && Array.isArray(parsed.records)){
+        if(!confirm(`匯入 ${parsed.records.length} 筆紀錄？（會與目前紀錄合併）`)) return;
+        parsed.records.forEach(r=>{
+          if(!records.some(x=>x.id===r.id)) records.push(r);
+        });
+        saveStorage();
+        renderRecordsList();
+        showToast(`⬆ 已匯入 ${parsed.records.length} 筆`);
+      } else {
+        // 單一表單資料
+        const now = new Date().toISOString();
+        const id = genId();
+        records.unshift({
+          id, clientName: parsed.clientName||'（無客戶名）',
+          projectName: parsed.projectName||'（匯入專案）',
+          createdAt: now, updatedAt: now, data: parsed
+        });
+        saveStorage();
+        loadRecord(id);
+        showToast(`📤 已匯入：${file.name}`);
+      }
+    } catch(err){ showToast('❌ JSON 格式錯誤'); }
+  };
+  reader.readAsText(file, 'utf-8');
+  evt.target.value = '';
+});
+
+// ═══ 預覽渲染 ═══
+function render(){
+  const d = collect();
+  setCell('p-productType', (d.productType||[]).join('、'));
+  setCell('p-applicant', d.applicant);
+  setCell('p-clientName', d.clientName);
+  setCell('p-applyDate', fmtDate(d.applyDate));
+  setCell('p-deliveryDate', fmtDate(d.deliveryDate));
+  setCell('p-visitDate', fmtDate(d.visitDate));
+  setCell('p-eventDate', d.eventDate);
+
+  let target = d.targetType || '';
+  if(target==='與媒代提案' && d.agencyName) target += `（${d.agencyName}）`;
+  setCell('p-target', target);
+  setCell('p-clientContact', d.clientContact);
+  setCell('p-decisionMaker', d.decisionMaker);
+  setCell('p-totalBudget', fmtMoney(d.totalBudget));
+  const budgets = [];
+  if(d.budgetPrint) budgets.push('平面 '+fmtMoney(d.budgetPrint));
+  if(d.budgetDigital) budgets.push('數位 '+fmtMoney(d.budgetDigital));
+  if(d.budgetEvent) budgets.push('活動 '+fmtMoney(d.budgetEvent));
+  if(d.budgetOther) budgets.push('其他 '+fmtMoney(d.budgetOther));
+  setCell('p-budgetBreakdown', budgets.join('　　'));
+
+  setCell('p-projectName', d.projectName);
+  setCell('p-projectDays', d.projectDays ? d.projectDays+' 天' : '');
+  const services = [...(d.services||[])];
+  if((d.servicesOtherCheck||[]).length && d.servicesOther) services.push('其他：'+d.servicesOther);
+  setCell('p-services', services.join('、'));
+  const purposes = [...(d.purposes||[])];
+  if((d.purposesOtherCheck||[]).length && d.purposesOther) purposes.push('其他：'+d.purposesOther);
+  setCell('p-purposes', purposes.join('、'));
+  setCell('p-audience', d.audience);
+  setCell('p-theme', d.theme);
+
+  setCell('p-painPoint', d.painPoint);
+  setCell('p-productStrength', d.productStrength);
+  setCell('p-hiddenNeeds', d.hiddenNeeds);
+  setCell('p-keywords', d.keywords);
+  setCell('p-kpi', d.kpi);
+
+  setCell('p-competitor', d.competitor);
+  setCell('p-competitorReview', d.competitorReview);
+  setCell('p-collaboration', d.collaboration);
+  setCell('p-winRate', d.winRate);
+  setCell('p-advantage', d.advantage);
+
+  const reportEl = document.getElementById('p-reportRequirement');
+  if(d.reportRequirement){
+    reportEl.innerHTML = `<div class="warn">⚠ 若未填寫，企畫將依標準結案報告格式提供</div>${escHtml(d.reportRequirement)}`;
+  } else {
+    reportEl.innerHTML = `<div class="warn">⚠ 若未填寫，企畫將依標準結案報告格式提供</div><span class="empty">—</span>`;
+  }
+  setCell('p-notes', d.notes);
+
+  setCell('p-execType', d.execType);
+  setCell('p-decisionDate', fmtDate(d.decisionDate));
+  setCell('p-eventPM', d.eventPM);
+  setCell('p-digitalPM', d.digitalPM);
+
+  // 簽核
+  setCell('p-approvalStatus', STATUS_LABEL[d.approvalStatus] || '');
+  setCell('p-approverName', d.approverName);
+  setCell('p-approvalDate', fmtDate(d.approvalDate));
+  setCell('p-approvalComment', d.approvalComment);
+  const signEl = document.getElementById('p-approvalSign');
+  if(d.approvalStatus==='approved' && d.approverName){
+    signEl.innerHTML = `<span style="font-family:'標楷體','DFKai-SB',serif;font-size:20px;color:#C00000;font-weight:600">${escHtml(d.approverName)} ✓</span>`;
+  } else {
+    signEl.innerHTML = '　';
+  }
+  const statusBadge = document.getElementById('status-badge');
+  if(statusBadge) statusBadge.textContent = STATUS_LABEL[d.approvalStatus] || '草稿';
+
+  setCell('p-outcome', d.outcome);
+  setCell('p-finalAmount', d.finalAmount ? fmtMoney(d.finalAmount) : '');
+  setCell('p-outcomeAnalysis', d.outcomeAnalysis);
+
+  updateProgress(d);
+  updateSectionDots(d);
+}
+
+function countFilled(d){
+  const keys = ['applicant','clientName','applyDate','deliveryDate','targetType','totalBudget',
+    'projectName','audience','painPoint','productStrength','hiddenNeeds','keywords','kpi',
+    'competitor','winRate','advantage'];
+  const filled = keys.filter(k=>{
+    const v = d[k];
+    if(Array.isArray(v)) return v.length>0;
+    return v && String(v).trim()!=='';
+  });
+  return { filled: filled.length, total: keys.length };
+}
+
+function updateProgress(d){
+  const {filled,total} = countFilled(d);
+  const pct = Math.round(filled/total*100);
+  document.getElementById('progress-fill').style.width = pct+'%';
+  document.getElementById('progress-text').textContent = `填寫進度 ${pct}%（${filled}/${total}）`;
+}
+
+function updateSectionDots(d){
+  Object.entries(SECTION_FIELDS).forEach(([sec, keys])=>{
+    const dot = document.getElementById('dot-'+sec);
+    if(!dot) return;
+    dot.classList.remove('done','partial');
+    if(keys.length===0) return;
+    const filled = keys.filter(k=>{
+      const v = d[k];
+      if(Array.isArray(v)) return v.length>0;
+      return v && String(v).trim()!=='';
+    }).length;
+    if(filled===keys.length) dot.classList.add('done');
+    else if(filled>0) dot.classList.add('partial');
+  });
+}
+
+// ═══ Section / Tab / Char ═══
+function toggleSection(header){
+  header.classList.toggle('collapsed');
+  header.nextElementSibling.classList.toggle('collapsed');
+}
+function switchTab(tab){
+  const tabs = document.querySelectorAll('.mobile-tabs button');
+  tabs[0].classList.toggle('active', tab==='form');
+  tabs[1].classList.toggle('active', tab==='preview');
+  document.getElementById('panel-form').classList.toggle('hidden', tab!=='form');
+  document.getElementById('panel-preview').classList.toggle('hidden', tab!=='preview');
+}
+function updateCharCount(el, max){
+  const len = el.value.length;
+  const cc = document.getElementById('cc-'+el.dataset.key);
+  if(!cc) return;
+  cc.textContent = `${len} / ${max}`;
+  cc.classList.toggle('warn', len > max*0.85);
+}
+
+// ═══ 列印驗證 ═══
+function getMissingRequired(d){
+  return REQUIRED_FIELDS.filter(([k])=>{
+    const v = d[k];
+    if(Array.isArray(v)) return v.length===0;
+    return !v || String(v).trim()==='';
+  });
+}
+function highlightErrors(missing){
+  document.querySelectorAll('.field-error').forEach(el=>el.classList.remove('field-error'));
+  missing.forEach(([k])=>{
+    document.querySelectorAll(`[data-key="${k}"]`).forEach(el=>{
+      const row = el.closest('.row');
+      if(row) row.classList.add('field-error');
+      const body = el.closest('.section-body');
+      if(body && body.classList.contains('collapsed')){
+        body.classList.remove('collapsed');
+        const h = body.previousElementSibling;
+        if(h) h.classList.remove('collapsed');
+      }
+    });
+  });
+}
+function printWithValidation(){
+  const d = collect();
+  const missing = getMissingRequired(d);
+  highlightErrors(missing);
+  if(missing.length===0){ window.print(); return; }
+  document.getElementById('modal-list').innerHTML = missing.map(([,l])=>`<li>${l}</li>`).join('');
+  document.getElementById('modal-overlay').classList.add('open');
+}
+function closeModal(){ document.getElementById('modal-overlay').classList.remove('open'); }
+function doPrint(){ closeModal(); window.print(); }
+
+// ═══ 自動儲存 ═══
+let autoSaveTimer = null;
+function scheduleAutoSave(){
+  isUnsaved = true;
+  clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(()=>{
+    if(!currentId) return; // 新單不自動存
+    const data = collect();
+    const idx = records.findIndex(r=>r.id===currentId);
+    if(idx>-1){
+      const rec = { ...records[idx], clientName: data.clientName||'（無客戶名）', projectName: data.projectName||'（未命名專案）', updatedAt: new Date().toISOString(), data };
+      pushToFirebase(rec);
+      const now = new Date();
+      const ts = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+      document.getElementById('autosave-info').innerHTML = `<span class="sync-dot"></span>已同步 ${ts}`;
+      isUnsaved = false;
+    }
+  }, 1200);
+}
+
+// ═══ Init ═══
+document.querySelectorAll('[data-key]').forEach(el=>{
+  el.addEventListener('input', ()=>{ render(); scheduleAutoSave(); });
+  el.addEventListener('change', ()=>{ render(); scheduleAutoSave(); });
+});
+document.getElementById('records-search').addEventListener('input', e=>{
+  filterQuery = e.target.value;
+  renderRecordsList();
+});
+document.getElementById('modal-overlay').addEventListener('click', e=>{
+  if(e.target===e.currentTarget) closeModal();
+});
+
+render();
+updateBadge();
+
+// 檢查 session 是否已登入
+try{
+  const sess = sessionStorage.getItem(SESSION_KEY);
+  if(sess){
+    const {role, name} = JSON.parse(sess);
+    userRole = role; userName = name;
+    showApp();
+  }
+} catch(e){}
+
+</script>
+</body>
+</html>
