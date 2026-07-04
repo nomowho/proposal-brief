@@ -297,6 +297,7 @@
       <button class="success" onclick="saveRecord()" id="btn-save">💾 儲存</button>
       <button onclick="saveAsNew()" id="btn-save-as">📄 另存新檔</button>
       <button onclick="submitForApproval()" id="btn-submit" style="background:#FFD966;color:var(--navy);border-color:#FFD966;font-weight:600">📤 送審</button>
+      <button onclick="finishApproval()" id="btn-finish-approval" style="display:none;background:#4ECB71;color:#fff;border-color:#4ECB71;font-weight:600">✅ 完成簽核並通知</button>
       <button onclick="exportCurrent()">📥 匯出</button>
       <button class="primary" onclick="printWithValidation()">🖨 列印 / PDF</button>
       <button onclick="changeManagerPin()" id="btn-change-pin" style="display:none" title="變更主管密碼">🔑 改密碼</button>
@@ -743,22 +744,39 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const DB_ROOT = 'proposal-briefs';
 
-// ═══ EmailJS 送審通知設定（註冊 emailjs.com 後填入三個值即啟用）═══
+// ═══ EmailJS 通知設定 ═══
 const EMAILJS_CONFIG = {
-  publicKey: '',           // EmailJS → Account → Public Key
-  serviceId: '',           // EmailJS → Email Services → Service ID
-  templateId: '',          // EmailJS → Email Templates → Template ID
-  managerEmail: ''         // 郭燕蓉主管的信箱
+  publicKey: '',                        // EmailJS → Account → Public Key
+  serviceId: 'service_2kxu18r',         // Gmail service
+  templateSubmit: '',                   // 範本一：送審通知主管
+  templateResult: '',                   // 範本二：簽核結果通知業務+企劃
+  managerEmail: 'kathy_kuo@cwgv.com.tw' // 郭燕蓉
+};
+// 信箱對照表
+const SALES_EMAILS = {
+  '王鳳儀':'rebeccaw@cwgv.com.tw',
+  '胡祖豪':'nomo@cwgv.com.tw',
+  '鄭順德':'neil@cwgv.com.tw',
+  '黃素盈':'tracyhuang@cwgv.com.tw',
+  '陳鉅業':'colin@cwgv.com.tw'
+};
+const PLANNER_EMAILS = {
+  '劉國宏':'ivan@cwgv.com.tw',
+  '郭大華':'dannykuo@cwgv.com.tw',
+  '許育瑋':'yuwei0223@cwgv.com.tw',
+  '盧昀葳':'claralu@cwgv.com.tw'
 };
 if(EMAILJS_CONFIG.publicKey && window.emailjs){
   emailjs.init({ publicKey: EMAILJS_CONFIG.publicKey });
 }
+const TOOL_URL = 'https://nomowho.github.io/proposal-brief/';
 
+// 送審 → 通知主管
 function sendApprovalEmail(d){
-  if(!EMAILJS_CONFIG.publicKey || !EMAILJS_CONFIG.serviceId || !EMAILJS_CONFIG.templateId){
+  if(!EMAILJS_CONFIG.publicKey || !EMAILJS_CONFIG.templateSubmit){
     return Promise.resolve('not-configured');
   }
-  return emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.templateId, {
+  return emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.templateSubmit, {
     to_email: EMAILJS_CONFIG.managerEmail,
     applicant: d.applicant || userName,
     client_name: d.clientName || '（未填）',
@@ -766,7 +784,35 @@ function sendApprovalEmail(d){
     budget: d.totalBudget ? 'NT$ ' + Number(d.totalBudget).toLocaleString() : '（未填）',
     pain_point: d.painPoint || '（未填）',
     kpi: d.kpi || '（未填）',
-    tool_url: location.href.split('#')[0]
+    tool_url: TOOL_URL
+  });
+}
+
+// 簽核完成 → 通知業務 + 指派企劃
+function sendResultEmail(rec){
+  if(!EMAILJS_CONFIG.publicKey || !EMAILJS_CONFIG.templateResult){
+    return Promise.resolve('not-configured');
+  }
+  const d = rec.data || {};
+  const recipients = new Set();
+  const salesMail = SALES_EMAILS[rec.ownerName];
+  if(salesMail) recipients.add(salesMail);
+  [d.eventPM, d.digitalPM].forEach(pm=>{
+    if(PLANNER_EMAILS[pm]) recipients.add(PLANNER_EMAILS[pm]);
+  });
+  if(recipients.size===0) return Promise.resolve('no-recipient');
+  const resultText = d.approvalStatus==='approved' ? '✅ 已核可' : '❌ 退件';
+  const planners = [d.eventPM, d.digitalPM].filter(p=>p).join('、') || '（未指派）';
+  return emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.templateResult, {
+    to_email: [...recipients].join(','),
+    result: resultText,
+    approver: d.approverName || MANAGER_NAME,
+    comment: d.approvalComment || '（無）',
+    applicant: rec.ownerName || d.applicant || '',
+    client_name: rec.clientName || '（未填）',
+    project_name: rec.projectName || '（未填）',
+    planners: planners,
+    tool_url: TOOL_URL
   });
 }
 
@@ -875,6 +921,39 @@ function doLogin(){
   showApp();
 }
 
+// 主管：完成簽核 → 存檔並通知業務 + 企劃
+function finishApproval(){
+  if(!currentId){ alert('請先從左側選擇要簽核的案子'); return; }
+  const d = collect();
+  if(d.approvalStatus!=='approved' && d.approvalStatus!=='rejected'){
+    alert('請先在「⚑ 主管簽核區」選擇 🟢 已核可 或 🔴 退件');
+    return;
+  }
+  if(d.approvalStatus==='rejected' && !d.approvalComment){
+    if(!confirm('退件建議填寫「主管意見/退件原因」讓業務知道修改方向。\n\n確定不填直接送出？')) return;
+  }
+  if(!d.approvalDate){
+    const dateEl = document.querySelector('[data-key="approvalDate"]');
+    if(dateEl){ dateEl.value = new Date().toISOString().slice(0,10); }
+  }
+  saveRecord();
+  const rec = records.find(r=>r.id===currentId) || { id: currentId, ownerName:'', clientName: d.clientName, projectName: d.projectName, data: collect() };
+  rec.data = collect();
+  const resultText = d.approvalStatus==='approved' ? '已核可' : '退件';
+  sendResultEmail(rec).then(res=>{
+    if(res==='not-configured'){
+      showToast(`✅ 已${resultText}（尚未設定自動寄信，請手動通知）`);
+    } else if(res==='no-recipient'){
+      showToast(`✅ 已${resultText}（找不到通知對象信箱）`);
+    } else {
+      showToast(`✅ 已${resultText}，通知信已寄給業務與企劃`);
+    }
+  }).catch(err=>{
+    console.error('EmailJS error', err);
+    showToast(`✅ 已${resultText}，但通知信寄送失敗`);
+  });
+}
+
 function changeManagerPin(){
   const cur = prompt('請輸入目前的主管密碼：');
   if(cur===null) return;
@@ -912,6 +991,7 @@ function applyRoleUI(){
   badge.classList.toggle('mgr', isMgr);
   document.querySelector('.btn-new').style.display = isMgr ? 'none' : 'block';
   document.getElementById('btn-change-pin').style.display = isMgr ? 'inline-block' : 'none';
+  document.getElementById('btn-finish-approval').style.display = isMgr ? 'inline-block' : 'none';
   if(isMgr){
     document.getElementById('records-search').placeholder = '搜尋業務、客戶或專案…';
     // 主管填入自己名字到核准主管欄
