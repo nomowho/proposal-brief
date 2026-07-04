@@ -232,6 +232,10 @@
   }
   .section.locked .section-header .collapse-icon{margin-left:0}
   .readonly-mode #btn-new,.readonly-mode #btn-save-as,.readonly-mode #btn-submit,.readonly-mode #btn-delete-hint{display:none}
+  /* 主管畫面：唯讀區塊整個隱藏，完整內容看右側預覽 */
+  .readonly-mode .section.locked{display:none}
+  .mgr-hint{display:none;background:#FFF9E6;border:1px solid #FFD966;border-radius:8px;padding:12px 16px;font-size:13px;color:#7F6000;margin-bottom:14px;line-height:1.7}
+  .readonly-mode .mgr-hint{display:block}
 
   /* Sync indicator */
   .sync-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#4ECB71;margin-right:4px;animation:pulse 2s infinite}
@@ -318,6 +322,8 @@
 
       <!-- 表單 -->
       <div class="panel form-panel" id="panel-form">
+
+        <div class="mgr-hint">⚑ 主管簽核模式：左側選擇案件後，完整的需求說明表內容請看<strong>右側預覽</strong>。這裡只需填寫「企劃回覆」與「簽核區」，完成後按上方「✅ 完成簽核並通知」。</div>
 
         <div class="section" data-section="A">
           <div class="section-header" onclick="toggleSection(this)">
