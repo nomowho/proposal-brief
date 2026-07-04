@@ -235,6 +235,7 @@
   /* 主管畫面：唯讀區塊整個隱藏，完整內容看右側預覽 */
   .readonly-mode .section.locked{display:none}
   .readonly-mode .status-sales-only{display:none}
+  .readonly-mode .approval-status-row{display:none}
   .mgr-hint{display:none;background:#FFF9E6;border:1px solid #FFD966;border-radius:8px;padding:12px 16px;font-size:13px;color:#7F6000;margin-bottom:14px;line-height:1.7}
   .readonly-mode .mgr-hint{display:block}
 
@@ -302,7 +303,8 @@
       <button class="success" onclick="saveRecord()" id="btn-save">💾 儲存</button>
       <button onclick="saveAsNew()" id="btn-save-as">📄 另存新檔</button>
       <button onclick="submitForApproval()" id="btn-submit" style="background:#FFD966;color:var(--navy);border-color:#FFD966;font-weight:600">📤 送審</button>
-      <button onclick="finishApproval()" id="btn-finish-approval" style="display:none;background:#4ECB71;color:#fff;border-color:#4ECB71;font-weight:600">✅ 完成簽核並通知</button>
+      <button onclick="finishApproval('approved')" id="btn-approve" style="display:none;background:#4ECB71;color:#fff;border-color:#4ECB71;font-weight:600">✅ 核可並通知</button>
+      <button onclick="finishApproval('rejected')" id="btn-reject" style="display:none;background:#E74C3C;color:#fff;border-color:#E74C3C;font-weight:600">🔴 退件並通知</button>
       <button onclick="exportCurrent()">📥 匯出</button>
       <button class="primary" onclick="printWithValidation()">🖨 列印 / PDF</button>
       <button onclick="changeManagerPin()" id="btn-change-pin" style="display:none" title="變更主管密碼">🔑 改密碼</button>
@@ -324,7 +326,7 @@
       <!-- 表單 -->
       <div class="panel form-panel" id="panel-form">
 
-        <div class="mgr-hint">⚑ 主管簽核模式：左側選擇案件後，完整的需求說明表內容請看<strong>右側預覽</strong>。這裡只需填寫「企劃回覆」與「簽核區」，完成後按上方「✅ 完成簽核並通知」。</div>
+        <div class="mgr-hint">⚑ 主管簽核模式：左側選擇案件後，完整內容請看<strong>右側預覽</strong>。填寫「企劃回覆」與「簽核區」後，按上方 <strong>✅ 核可並通知</strong> 或 <strong>🔴 退件並通知</strong> 完成流程。</div>
 
         <div class="section" data-section="A">
           <div class="section-header" onclick="toggleSection(this)">
@@ -576,7 +578,7 @@
             <span class="collapse-icon">▼</span>
           </div>
           <div class="section-body">
-            <div class="row">
+            <div class="row approval-status-row">
               <label>簽核狀態</label>
               <div class="radio-group">
                 <label class="status-sales-only"><input type="radio" name="approvalStatus" data-key="approvalStatus" value="draft"> 草稿</label>
@@ -929,13 +931,14 @@ function doLogin(){
 }
 
 // 主管：完成簽核 → 存檔並通知業務 + 企劃
-function finishApproval(){
+function finishApproval(status){
   if(!currentId){ alert('請先從左側選擇要簽核的案子'); return; }
-  const d = collect();
-  if(d.approvalStatus!=='approved' && d.approvalStatus!=='rejected'){
-    alert('請先在「⚑ 主管簽核區」選擇 🟢 已核可 或 🔴 退件');
-    return;
+  // 直接由按鈕傳入 status，同步更新 radio
+  if(status){
+    const radio = document.querySelector(`[name="approvalStatus"][value="${status}"]`);
+    if(radio){ radio.checked = true; }
   }
+  const d = collect();
   if(d.approvalStatus==='rejected' && !d.approvalComment){
     if(!confirm('退件建議填寫「主管意見/退件原因」讓業務知道修改方向。\n\n確定不填直接送出？')) return;
   }
@@ -998,7 +1001,8 @@ function applyRoleUI(){
   badge.classList.toggle('mgr', isMgr);
   document.querySelector('.btn-new').style.display = isMgr ? 'none' : 'block';
   document.getElementById('btn-change-pin').style.display = isMgr ? 'inline-block' : 'none';
-  document.getElementById('btn-finish-approval').style.display = isMgr ? 'inline-block' : 'none';
+  document.getElementById('btn-approve').style.display = isMgr ? 'inline-block' : 'none';
+  document.getElementById('btn-reject').style.display = isMgr ? 'inline-block' : 'none';
   if(isMgr){
     document.getElementById('records-search').placeholder = '搜尋業務、客戶或專案…';
     // 主管填入自己名字到核准主管欄
