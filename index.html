@@ -240,6 +240,10 @@
   .readonly-mode .approval-status-row{display:none}
   .mgr-hint{display:none;background:#FFF9E6;border:1px solid #FFD966;border-radius:8px;padding:12px 16px;font-size:13px;color:#7F6000;margin-bottom:14px;line-height:1.7}
   .readonly-mode .mgr-hint{display:block}
+  .planner-hint{display:none;background:#EAF3FB;border:1px solid #9CC3E4;border-radius:8px;padding:12px 16px;font-size:13px;color:#1F4E79;margin-bottom:14px;line-height:1.7}
+  .planner-mode .mgr-hint{display:none}
+  .planner-mode .planner-hint{display:block}
+  .planner-mode #btn-save{display:none}
 
   /* Sync indicator */
   .sync-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#4ECB71;margin-right:4px;animation:pulse 2s infinite}
@@ -256,6 +260,7 @@
     <div class="sub">請先登入以繼續</div>
     <div class="role-tabs">
       <button class="active" onclick="setLoginRole('sales')" id="role-tab-sales">👤 業務</button>
+      <button onclick="setLoginRole('planner')" id="role-tab-planner">🎯 企劃</button>
       <button onclick="setLoginRole('manager')" id="role-tab-manager">⚑ 主管</button>
     </div>
     <label id="login-name-label">您的姓名</label>
@@ -266,6 +271,13 @@
       <option value="陳鉅業">陳鉅業</option>
       <option value="黃素盈">黃素盈</option>
       <option value="鄭順德">鄭順德</option>
+    </select>
+    <select id="login-name-planner" style="display:none">
+      <option value="">請選擇…</option>
+      <option value="劉國宏">劉國宏</option>
+      <option value="郭大華">郭大華</option>
+      <option value="許育瑋">許育瑋</option>
+      <option value="盧昀葳">盧昀葳</option>
     </select>
     <input type="text" id="login-name-mgr" value="郭燕蓉" readonly style="display:none;background:#F5F7FA;color:#5a6a7e">
     <label>密碼</label>
@@ -331,6 +343,7 @@
       <div class="panel form-panel" id="panel-form">
 
         <div class="mgr-hint">⚑ 主管簽核模式：左側選擇案件後，完整內容請看<strong>右側預覽</strong>。填寫「企劃回覆」與「簽核區」後，按上方 <strong>✅ 核可並通知</strong> 或 <strong>🔴 退件並通知</strong> 完成流程。</div>
+        <div class="planner-hint">🎯 企劃檢視模式：左側只列出<strong>指派給你的案子</strong>（依業務分組），點選後完整需求內容請看<strong>右側預覽</strong>，可按「🖨 列印 / PDF」輸出。</div>
 
         <div class="section" data-section="A">
           <div class="section-header" onclick="toggleSection(this)">
@@ -912,16 +925,20 @@ function showToast(msg){
 function setLoginRole(role){
   loginRoleTmp = role;
   document.getElementById('role-tab-sales').classList.toggle('active', role==='sales');
+  document.getElementById('role-tab-planner').classList.toggle('active', role==='planner');
   document.getElementById('role-tab-manager').classList.toggle('active', role==='manager');
-  document.getElementById('login-name-label').textContent = role==='manager' ? '主管姓名' : '業務姓名';
-  document.getElementById('login-name-sales').style.display = role==='manager' ? 'none' : 'block';
+  document.getElementById('login-name-label').textContent = role==='manager' ? '主管姓名' : (role==='planner' ? '企劃姓名' : '業務姓名');
+  document.getElementById('login-name-sales').style.display = role==='sales' ? 'block' : 'none';
+  document.getElementById('login-name-planner').style.display = role==='planner' ? 'block' : 'none';
   document.getElementById('login-name-mgr').style.display = role==='manager' ? 'block' : 'none';
 }
 
 function doLogin(){
   const name = loginRoleTmp==='manager'
     ? MANAGER_NAME
-    : document.getElementById('login-name-sales').value.trim();
+    : (loginRoleTmp==='planner'
+        ? document.getElementById('login-name-planner').value.trim()
+        : document.getElementById('login-name-sales').value.trim());
   const pin = document.getElementById('login-pin').value.trim();
   const err = document.getElementById('login-error');
   if(!name){ err.textContent='請選擇姓名'; return; }
@@ -999,11 +1016,13 @@ function showApp(){
 
 function applyRoleUI(){
   const isMgr = userRole==='manager';
-  document.body.classList.toggle('readonly-mode', isMgr);
+  const isPlanner = userRole==='planner';
+  document.body.classList.toggle('readonly-mode', isMgr || isPlanner);
+  document.body.classList.toggle('planner-mode', isPlanner);
   const badge = document.getElementById('role-badge');
-  badge.textContent = isMgr ? '⚑ 主管' : '👤 業務';
+  badge.textContent = isMgr ? '⚑ 主管' : (isPlanner ? '🎯 企劃' : '👤 業務');
   badge.classList.toggle('mgr', isMgr);
-  document.querySelector('.btn-new').style.display = isMgr ? 'none' : 'block';
+  document.querySelector('.btn-new').style.display = (isMgr || isPlanner) ? 'none' : 'block';
   document.getElementById('btn-change-pin').style.display = isMgr ? 'inline-block' : 'none';
   document.getElementById('btn-approve').style.display = isMgr ? 'inline-block' : 'none';
   document.getElementById('btn-reject').style.display = isMgr ? 'inline-block' : 'none';
@@ -1013,16 +1032,21 @@ function applyRoleUI(){
     const nameEl = document.querySelector('[data-key="approverName"]');
     if(nameEl && !nameEl.value) nameEl.value = userName;
   }
-  lockNonApprovalSections(isMgr);
+  if(isPlanner){
+    document.getElementById('records-search').placeholder = '搜尋業務、客戶或專案…';
+  }
+  lockNonApprovalSections();
 }
 
 // G（企劃回覆）與 I（簽核）為主管專屬區；其餘為業務區
 const MANAGER_SECTIONS = ['G','I'];
 function lockNonApprovalSections(){
   const isMgr = userRole==='manager';
+  const isPlanner = userRole==='planner';
   document.querySelectorAll('.section').forEach(sec=>{
     const isMgrSection = MANAGER_SECTIONS.includes(sec.dataset.section);
-    const editable = isMgr ? isMgrSection : !isMgrSection;
+    // 企劃：全部唯讀，內容看右側預覽
+    const editable = isPlanner ? false : (isMgr ? isMgrSection : !isMgrSection);
     sec.classList.toggle('locked', !editable);
     sec.querySelectorAll('input, textarea, select').forEach(el=>{
       if(editable){ el.removeAttribute('disabled'); }
@@ -1283,7 +1307,7 @@ function loadRecord(id){
 
 function deleteRecord(id, ev){
   ev.stopPropagation();
-  if(userRole==='manager'){ showToast('主管無法刪除紀錄'); return; }
+  if(userRole!=='sales'){ showToast('只有業務可以刪除紀錄'); return; }
   const rec = records.find(r=>r.id===id);
   if(!rec) return;
   if(!confirm(`確定刪除「${rec.clientName} · ${rec.projectName}」？`)) return;
@@ -1296,23 +1320,28 @@ function deleteRecord(id, ev){
 function renderRecordsList(){
   const container = document.getElementById('records-list');
   let list = records;
+  // 企劃：只列出被指派給自己的案子（活動主責或數位主責）
+  if(userRole==='planner'){
+    list = list.filter(r => r.data?.eventPM===userName || r.data?.digitalPM===userName);
+  }
   if(filterQuery){
     const q = filterQuery.toLowerCase();
-    list = records.filter(r =>
+    list = list.filter(r =>
       (r.clientName||'').toLowerCase().includes(q) ||
       (r.projectName||'').toLowerCase().includes(q) ||
       (r.ownerName||'').toLowerCase().includes(q)
     );
   }
   if(list.length===0){
-    const emptyMsg = userRole==='manager' ? '目前沒有待審案子' : '尚無紀錄<br>填寫後點「儲存」建立第一份';
+    const emptyMsg = userRole==='manager' ? '目前沒有待審案子'
+      : (userRole==='planner' ? '目前沒有指派給你的案子' : '尚無紀錄<br>填寫後點「儲存」建立第一份');
     container.innerHTML = `<div class="records-empty">${emptyMsg}</div>`;
     return;
   }
-  // 業務：依客戶分群；主管：依業務員分群
+  // 業務：依客戶分群；主管與企劃：依業務員分群
   const groups = new Map();
   list.forEach(r=>{
-    const k = userRole==='manager'
+    const k = (userRole==='manager' || userRole==='planner')
       ? (r.ownerName || '（未知業務）')
       : (r.clientName || '（無客戶名）');
     if(!groups.has(k)) groups.set(k, []);
@@ -1331,7 +1360,7 @@ function renderRecordsList(){
         <div class="record-item${active}" onclick="loadRecord('${escHtml(rec.id)}')">
           <button class="record-delete" onclick="deleteRecord('${escHtml(rec.id)}',event)" title="刪除">✕</button>
           <div class="record-item-title">${escHtml(rec.projectName||'（未命名）')}</div>
-          <div class="record-item-meta"><span class="record-status ${status}">${statusLabel}</span>${escHtml(date)}${userRole==='manager' ? (rec.clientName?' · '+escHtml(rec.clientName):'') : (rec.ownerName?' · '+escHtml(rec.ownerName):'')}</div>
+          <div class="record-item-meta"><span class="record-status ${status}">${statusLabel}</span>${escHtml(date)}${(userRole==='manager'||userRole==='planner') ? (rec.clientName?' · '+escHtml(rec.clientName):'') : (rec.ownerName?' · '+escHtml(rec.ownerName):'')}</div>
         </div>`;
     }).join('');
     html += `
