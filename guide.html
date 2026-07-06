@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>專案需求說明表 簽核流程說明</title>
+<style>
+  :root{
+    --navy:#1B2A4A; --gold:#FFD966; --green:#4ECB71; --red:#E74C3C;
+    --blue:#3B82C4; --gray:#8A94A6; --bg:#F5F7FA; --line:#D8DEE9;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;font-family:"Noto Sans TC","Microsoft JhengHei",sans-serif}
+  body{background:var(--bg);color:var(--navy);padding:36px 20px}
+  .page{max-width:860px;margin:0 auto}
+
+  /* ===== header ===== */
+  .header{background:var(--navy);color:#fff;border-radius:14px;padding:28px 34px;margin-bottom:14px}
+  .header h1{font-size:26px;letter-spacing:2px}
+  .header .sub{color:var(--gold);font-size:14px;margin-top:6px;letter-spacing:1px}
+  .urlbar{background:#fff;border:2px solid var(--navy);border-radius:10px;padding:12px 20px;
+    display:flex;align-items:center;gap:12px;margin-bottom:30px;flex-wrap:wrap}
+  .urlbar .lab{background:var(--navy);color:#fff;font-size:12px;padding:4px 10px;border-radius:6px;letter-spacing:1px}
+  .urlbar a{font-size:16px;font-weight:700;color:var(--navy);text-decoration:none;word-break:break-all}
+  .urlbar .note{font-size:12px;color:var(--gray)}
+
+  /* ===== login table ===== */
+  h2.sec{font-size:18px;letter-spacing:2px;margin:34px 0 14px;display:flex;align-items:center;gap:10px}
+  h2.sec::before{content:"";width:6px;height:22px;background:var(--gold);border-radius:3px}
+  table.login{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;font-size:14px}
+  table.login th,table.login td{border:1px solid var(--line);padding:10px 14px;text-align:left}
+  table.login th{background:var(--navy);color:#fff;font-weight:500;letter-spacing:1px}
+  table.login td:first-child{background:#EEF2F7;font-weight:700;width:110px}
+
+  /* ===== legend ===== */
+  .legend{display:flex;gap:14px;margin:6px 0 18px;flex-wrap:wrap}
+  .legend .item{display:flex;align-items:center;gap:6px;font-size:13px;color:#444}
+  .chip{width:14px;height:14px;border-radius:4px;display:inline-block}
+
+  /* ===== flow ===== */
+  .flow{display:flex;flex-direction:column;align-items:center}
+  .step{width:100%;max-width:640px;background:#fff;border:2px solid var(--line);border-radius:12px;
+    padding:16px 22px;display:flex;gap:16px;align-items:flex-start;position:relative}
+  .step .num{min-width:34px;height:34px;border-radius:50%;background:var(--navy);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;margin-top:2px}
+  .step .who{font-size:12px;font-weight:700;color:#fff;padding:3px 10px;border-radius:20px;
+    letter-spacing:1px;display:inline-block;margin-bottom:6px}
+  .who.sales{background:var(--blue)}
+  .who.system{background:var(--gray)}
+  .who.manager{background:#B08810}
+  .step h3{font-size:16px;margin-bottom:4px}
+  .step p{font-size:13.5px;color:#333;line-height:1.75}
+  .step .btn-hint{display:inline-block;background:var(--navy);color:#fff;font-size:13px;
+    padding:3px 12px;border-radius:6px;margin:2px 2px 2px 0}
+  .btn-hint.gold{background:var(--gold);color:var(--navy);font-weight:700}
+  .btn-hint.green{background:var(--green)}
+  .btn-hint.red{background:var(--red)}
+  .step.sales-border{border-color:var(--blue)}
+  .step.system-border{border-color:var(--gray);background:#F4F6F9}
+  .step.manager-border{border-color:var(--gold)}
+  .arrow{width:3px;height:30px;background:var(--navy);position:relative;margin:2px 0}
+  .arrow::after{content:"";position:absolute;bottom:-2px;left:50%;transform:translateX(-50%);
+    border:7px solid transparent;border-top-color:var(--navy);border-bottom:0}
+
+  /* branch */
+  .branch{width:100%;max-width:760px;display:flex;gap:20px;margin-top:2px}
+  .branch-col{flex:1;display:flex;flex-direction:column;align-items:center}
+  .branch-label{font-size:14px;font-weight:700;padding:6px 22px;border-radius:20px;margin-bottom:10px;color:#fff}
+  .branch-label.ok{background:var(--green)}
+  .branch-label.ng{background:var(--red)}
+  .branch .step{max-width:100%}
+  .loopback{margin-top:10px;font-size:13px;font-weight:700;color:var(--red);background:#FDECEA;
+    border:1.5px dashed var(--red);border-radius:10px;padding:10px 16px;text-align:center;line-height:1.7}
+
+  /* ===== mail table ===== */
+  table.mail{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;font-size:13.5px}
+  table.mail th,table.mail td{border:1px solid var(--line);padding:10px 14px;text-align:left;line-height:1.6}
+  table.mail th{background:var(--navy);color:#fff;font-weight:500;letter-spacing:1px}
+
+  /* ===== status ===== */
+  .status-row{display:flex;gap:12px;flex-wrap:wrap}
+  .status-card{flex:1;min-width:170px;background:#fff;border:1.5px solid var(--line);border-radius:10px;padding:14px 16px}
+  .status-card b{font-size:15px;display:block;margin-bottom:4px}
+  .status-card span{font-size:12.5px;color:#555;line-height:1.6;display:block}
+
+  .footer{margin-top:36px;text-align:center;font-size:12px;color:var(--gray);letter-spacing:1px}
+
+  @media print{
+    body{background:#fff;padding:0}
+    .page{max-width:100%}
+    .step,.status-card,table{break-inside:avoid}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="header">
+    <h1>專案需求說明表｜線上簽核流程</h1>
+    <div class="sub">遠見雜誌 整合傳播部 · 業務 × 主管 協作說明</div>
+  </div>
+
+  <div class="urlbar">
+    <span class="lab">系統網址</span>
+    <a href="https://nomowho.github.io/proposal-brief/">nomowho.github.io/proposal-brief</a>
+    <span class="note">電腦手機皆可用 · 雲端即時同步 · 免安裝</span>
+  </div>
+
+  <h2 class="sec">登入資訊</h2>
+  <table class="login">
+    <tr><th></th><th>業務</th><th>⚑ 主管</th></tr>
+    <tr><td>登入分頁</td><td>「業務」</td><td>「⚑ 主管」</td></tr>
+    <tr><td>姓名</td><td>下拉選自己（王鳳儀 / 胡祖豪 / 陳鉅業 / 黃素盈 / 鄭順德）</td><td>固定：郭燕蓉</td></tr>
+    <tr><td>密碼</td><td>20905449</td><td>20905449（登入後可按 🔑 改密碼）</td></tr>
+  </table>
+
+  <h2 class="sec">完整簽核流程</h2>
+  <div class="legend">
+    <div class="item"><span class="chip" style="background:var(--blue)"></span>業務操作</div>
+    <div class="item"><span class="chip" style="background:#B08810"></span>主管操作</div>
+    <div class="item"><span class="chip" style="background:var(--gray)"></span>系統自動（不用做任何事）</div>
+  </div>
+
+  <div class="flow">
+
+    <div class="step sales-border">
+      <div class="num">1</div>
+      <div>
+        <span class="who sales">業務</span>
+        <h3>建立表單，填寫需求內容</h3>
+        <p>左側 <span class="btn-hint">＋ 新增</span> 建立表單，依序填 A～F 區（專案資料、客戶背景、需求、預算時程）。系統邊填邊自動儲存，右側預覽即最終版面。</p>
+      </div>
+    </div>
+    <div class="arrow"></div>
+
+    <div class="step sales-border">
+      <div class="num">2</div>
+      <div>
+        <span class="who sales">業務</span>
+        <h3>送審</h3>
+        <p>內容確認無誤後，按上方 <span class="btn-hint gold">📤 送審</span>。</p>
+      </div>
+    </div>
+    <div class="arrow"></div>
+
+    <div class="step system-border">
+      <div class="num">3</div>
+      <div>
+        <span class="who system">系統自動</span>
+        <h3>狀態轉 🟡 待審，Email 通知主管</h3>
+        <p>系統自動寄信到主管信箱（kathy_kuo@cwgv.com.tw），附上案件資訊與系統網址。業務不用再另外通知。</p>
+      </div>
+    </div>
+    <div class="arrow"></div>
+
+    <div class="step manager-border">
+      <div class="num">4</div>
+      <div>
+        <span class="who manager">主管</span>
+        <h3>審閱案件，填寫回覆</h3>
+        <p>登入後左側依業務姓名分組，點開 🟡 待審 案件。完整內容看<b>右側預覽</b>；主管畫面只需填兩區：<br>
+        <b>G 企劃回覆</b>（指派企劃：劉國宏 / 郭大華 / 許育瑋 / 盧昀葳）＋ <b>I 簽核意見</b>（退件時務必寫原因）。</p>
+      </div>
+    </div>
+    <div class="arrow"></div>
+
+    <div class="step manager-border">
+      <div class="num">5</div>
+      <div>
+        <span class="who manager">主管</span>
+        <h3>一鍵完成簽核</h3>
+        <p>按上方 <span class="btn-hint green">✅ 核可並通知</span> 或 <span class="btn-hint red">🔴 退件並通知</span>，二選一。存檔、改狀態、寄通知信全部自動完成。</p>
+      </div>
+    </div>
+    <div class="arrow"></div>
+
+    <div class="branch">
+      <div class="branch-col">
+        <div class="branch-label ok">🟢 核可</div>
+        <div class="step system-border">
+          <div class="num">6</div>
+          <div>
+            <span class="who system">系統自動</span>
+            <h3>通知業務＋指派企劃</h3>
+            <p>結果信寄給該業務與被指派的企劃人員，專案開始執行。</p>
+          </div>
+        </div>
+        <div class="arrow"></div>
+        <div class="step sales-border">
+          <div class="num">7</div>
+          <div>
+            <span class="who sales">業務</span>
+            <h3>結案後填 H 區「結果追蹤」</h3>
+            <p>回填成交金額與執行結果，留下完整專案紀錄。</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="branch-col">
+        <div class="branch-label ng">🔴 退件</div>
+        <div class="step system-border">
+          <div class="num">6</div>
+          <div>
+            <span class="who system">系統自動</span>
+            <h3>通知業務退件原因</h3>
+            <p>結果信寄給該業務，內含主管意見與修改方向。</p>
+          </div>
+        </div>
+        <div class="arrow"></div>
+        <div class="step sales-border">
+          <div class="num">7</div>
+          <div>
+            <span class="who sales">業務</span>
+            <h3>依意見修改內容</h3>
+            <p>回系統修改後，再按 <span class="btn-hint gold">📤 送審</span>。</p>
+          </div>
+        </div>
+        <div class="loopback">↩ 回到步驟 3，流程重新跑一次<br>直到核可為止</div>
+      </div>
+    </div>
+
+  </div>
+
+  <h2 class="sec">狀態一覽</h2>
+  <div class="status-row">
+    <div class="status-card"><b>⚪ 草稿</b><span>業務填寫中，尚未送審</span></div>
+    <div class="status-card"><b>🟡 待審</b><span>已送出，等主管簽核（送審後自動轉換）</span></div>
+    <div class="status-card"><b>🟢 已核可</b><span>主管核可，專案開始執行</span></div>
+    <div class="status-card"><b>🔴 退件</b><span>依主管意見修改後，重新送審</span></div>
+  </div>
+
+  <h2 class="sec">自動通知信</h2>
+  <table class="mail">
+    <tr><th>時機</th><th>收件人</th><th>信件內容</th></tr>
+    <tr><td>業務按「📤 送審」</td><td>主管</td><td>案件名稱、業務、客戶 ＋ 系統網址</td></tr>
+    <tr><td>主管按「✅ 核可並通知」</td><td>該業務 ＋ 指派企劃</td><td>核可結果、企劃回覆、主管意見</td></tr>
+    <tr><td>主管按「🔴 退件並通知」</td><td>該業務</td><td>退件原因與修改方向</td></tr>
+  </table>
+  <p style="font-size:12.5px;color:var(--gray);margin-top:8px">＊通知信由系統 Gmail 寄出，若未收到請先查看垃圾信件匣；系統內左側清單狀態永遠是最新的。</p>
+
+  <div class="footer">遠見雜誌 整合傳播部 · 專案需求說明表線上簽核系統 · 2026.07</div>
+
+</div>
+</body>
+</html>
