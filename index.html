@@ -580,7 +580,7 @@
                 </select>
               </div>
             </div>
-            <div class="row">
+            <div class="row" style="display:none"><!-- 決定日期：簽核時自動記錄 -->
               <label>決定日期</label>
               <input type="date" data-key="decisionDate">
             </div>
@@ -606,7 +606,7 @@
             </div>
             <div class="row two-col">
               <div><label>核准主管</label><input type="text" data-key="approverName" placeholder="主管姓名 / 職稱"></div>
-              <div><label>簽核日期</label><input type="date" data-key="approvalDate"></div>
+              <div style="display:none"><label>簽核日期</label><input type="date" data-key="approvalDate"></div><!-- 簽核時自動記錄 -->
             </div>
             <div class="row">
               <label>主管意見 / 退件原因</label>
@@ -963,10 +963,12 @@ function finishApproval(status){
   if(d.approvalStatus==='rejected' && !d.approvalComment){
     if(!confirm('退件建議填寫「主管意見/退件原因」讓業務知道修改方向。\n\n確定不填直接送出？')) return;
   }
-  if(!d.approvalDate){
-    const dateEl = document.querySelector('[data-key="approvalDate"]');
-    if(dateEl){ dateEl.value = new Date().toISOString().slice(0,10); }
-  }
+  // 簽核當下自動記錄簽核日期與決定日期
+  const today = new Date().toISOString().slice(0,10);
+  const dateEl = document.querySelector('[data-key="approvalDate"]');
+  if(dateEl) dateEl.value = today;
+  const decEl = document.querySelector('[data-key="decisionDate"]');
+  if(decEl) decEl.value = today;
   saveRecord();
   const rec = records.find(r=>r.id===currentId) || { id: currentId, ownerName:'', clientName: d.clientName, projectName: d.projectName, data: collect() };
   rec.data = collect();
@@ -1296,8 +1298,6 @@ function loadRecord(id){
   if(userRole==='manager'){
     const nameEl = document.querySelector('[data-key="approverName"]');
     if(nameEl && !nameEl.value) nameEl.value = userName;
-    const dateEl = document.querySelector('[data-key="approvalDate"]');
-    if(dateEl && !dateEl.value) dateEl.value = new Date().toISOString().slice(0,10);
   }
   render();
   updateBadge();
