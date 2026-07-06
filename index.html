@@ -216,6 +216,8 @@
   .login-box .btn-login:hover{background:#163d63}
   .login-error{color:var(--red);font-size:12px;margin-top:-8px;margin-bottom:10px;min-height:16px}
   .login-hint{font-size:11px;color:var(--muted);margin-top:14px;line-height:1.6;text-align:center}
+  .login-guide-link{display:block;text-align:center;margin-top:16px;padding:9px 12px;font-size:13px;font-weight:600;color:var(--navy);background:#FFF9E6;border:1px solid #FFD966;border-radius:6px;text-decoration:none;transition:.15s}
+  .login-guide-link:hover{background:#FFD966}
 
   /* Role badge in toolbar */
   .role-badge{background:rgba(255,255,255,.2);padding:3px 8px;border-radius:10px;font-size:11px;color:#fff;font-weight:600}
@@ -270,6 +272,7 @@
     <input type="password" id="login-pin" placeholder="請輸入密碼" onkeydown="if(event.key==='Enter')doLogin()">
     <div class="login-error" id="login-error"></div>
     <button class="btn-login" onclick="doLogin()">登入</button>
+    <a class="login-guide-link" href="https://nomowho.github.io/proposal-brief/guide.html" target="_blank">📖 簽核流程說明（第一次使用先看這裡）</a>
   </div>
 </div>
 
