@@ -244,6 +244,8 @@
   .planner-mode .mgr-hint{display:none}
   .planner-mode .planner-hint{display:block}
   .planner-mode #btn-save{display:none}
+  .assign-banner{background:#E8F6EC;border:1.5px solid #4ECB71;border-radius:8px;padding:11px 16px;font-size:13.5px;font-weight:600;color:#1E6B38;margin-bottom:14px;line-height:1.7}
+  .record-item-pm{font-size:11px;color:#1E6B38;background:#E8F6EC;border-radius:4px;padding:2px 6px;margin-top:4px;display:inline-block}
 
   /* Sync indicator */
   .sync-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#4ECB71;margin-right:4px;animation:pulse 2s infinite}
@@ -344,6 +346,7 @@
 
         <div class="mgr-hint">⚑ 主管簽核模式：左側選擇案件後，完整內容請看<strong>右側預覽</strong>。填寫「企劃回覆」與「簽核區」後，按上方 <strong>✅ 核可並通知</strong> 或 <strong>🔴 退件並通知</strong> 完成流程。</div>
         <div class="planner-hint">🎯 企劃檢視模式：左側只列出<strong>指派給你的案子</strong>（依業務分組），點選後完整需求內容請看<strong>右側預覽</strong>，可按「🖨 列印 / PDF」輸出。</div>
+        <div class="assign-banner" id="assign-banner" style="display:none"></div>
 
         <div class="section" data-section="A">
           <div class="section-header" onclick="toggleSection(this)">
@@ -1356,11 +1359,14 @@ function renderRecordsList(){
       const active = rec.id===currentId ? ' active' : '';
       const status = rec.data?.approvalStatus || 'draft';
       const statusLabel = { draft:'草稿', pending:'待審', approved:'已核可', rejected:'退件' }[status];
+      const pmNames = [rec.data?.eventPM, rec.data?.digitalPM].filter(Boolean).join('、');
+      const pmLine = (userRole!=='planner' && pmNames) ? `<div class="record-item-pm">🎯 企劃：${escHtml(pmNames)}</div>` : '';
       return `
         <div class="record-item${active}" onclick="loadRecord('${escHtml(rec.id)}')">
           <button class="record-delete" onclick="deleteRecord('${escHtml(rec.id)}',event)" title="刪除">✕</button>
           <div class="record-item-title">${escHtml(rec.projectName||'（未命名）')}</div>
           <div class="record-item-meta"><span class="record-status ${status}">${statusLabel}</span>${escHtml(date)}${(userRole==='manager'||userRole==='planner') ? (rec.clientName?' · '+escHtml(rec.clientName):'') : (rec.ownerName?' · '+escHtml(rec.ownerName):'')}</div>
+          ${pmLine}
         </div>`;
     }).join('');
     html += `
@@ -1510,6 +1516,20 @@ function render(){
   setCell('p-decisionDate', fmtDate(d.decisionDate));
   setCell('p-eventPM', d.eventPM);
   setCell('p-digitalPM', d.digitalPM);
+
+  // 業務端：明確顯示本案指派的企劃負責人
+  const assignBanner = document.getElementById('assign-banner');
+  if(assignBanner){
+    const pms = [];
+    if(d.eventPM) pms.push('活動主責：' + d.eventPM);
+    if(d.digitalPM) pms.push('數位主責：' + d.digitalPM);
+    if(userRole==='sales' && pms.length){
+      assignBanner.textContent = '🎯 本案企劃負責人 ｜ ' + pms.join('　·　');
+      assignBanner.style.display = 'block';
+    } else {
+      assignBanner.style.display = 'none';
+    }
+  }
 
   // 簽核
   setCell('p-approvalStatus', STATUS_LABEL[d.approvalStatus] || '');
