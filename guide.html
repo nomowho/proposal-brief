@@ -110,8 +110,8 @@
     <tr><th></th><th>業務</th><th>🎯 企劃</th><th>⚑ 主管</th></tr>
     <tr><td>登入分頁</td><td>「業務」</td><td>「🎯 企劃」</td><td>「⚑ 主管」</td></tr>
     <tr><td>姓名</td><td>下拉選自己（王鳳儀 / 胡祖豪 / 陳鉅業 / 黃素盈 / 鄭順德）</td><td>下拉選自己（劉國宏 / 郭大華 / 許育瑋 / 盧昀葳）</td><td>固定：郭燕蓉</td></tr>
-    <tr><td>密碼</td><td>20905449</td><td>20905449</td><td>20905449（登入後可按 🔑 改密碼）</td></tr>
-    <tr><td>權限</td><td>填 A–F、H 區，送審</td><td>檢視被指派的案子（唯讀，可列印）</td><td>填 G、I 區，核可 / 退件</td></tr>
+    <tr><td>密碼</td><td>預設 20905449<br>（登入後可按 🔑 改密碼）</td><td>預設 20905449<br>（登入後可按 🔑 改密碼）</td><td>預設 20905449<br>（登入後可按 🔑 改密碼）</td></tr>
+    <tr><td>權限</td><td>填 A–F、H 區，送審<br>（只看得到自己的案子）</td><td>檢視被指派的案子（唯讀，可列印）</td><td>填 G、I 區，核可 / 退件</td></tr>
   </table>
 
   <h2 class="sec">完整簽核流程</h2>
@@ -223,11 +223,14 @@
 
   <h2 class="sec">狀態一覽</h2>
   <div class="status-row">
-    <div class="status-card"><b>⚪ 草稿</b><span>業務填寫中，尚未送審</span></div>
-    <div class="status-card"><b>🟡 待審</b><span>已送出，等主管簽核（送審後自動轉換）</span></div>
-    <div class="status-card"><b>🟢 已核可</b><span>主管核可，專案開始執行</span></div>
-    <div class="status-card"><b>🔴 退件</b><span>依主管意見修改後，重新送審</span></div>
+    <div class="status-card"><b>⚪ 草稿</b><span>業務填寫中，尚未送審。業務可編輯</span></div>
+    <div class="status-card"><b>🟡 待審</b><span>已送出，等主管簽核。業務唯讀，主管可簽核</span></div>
+    <div class="status-card"><b>🟢 已核可</b><span>主管核可，專案開始執行。全部唯讀</span></div>
+    <div class="status-card"><b>🔴 退件</b><span>依主管意見修改後，重新送審。業務可編輯</span></div>
   </div>
+  <p style="font-size:12.5px;color:#44546A;margin-top:10px;background:#F0F3F7;border:1px solid #B8C4D4;border-radius:8px;padding:10px 14px;line-height:1.8">
+    🔒 <b>階段鎖定規則</b>：案子在誰的階段，就只有誰能編輯——送審後業務不能再改（避免審核中內容變動）；主管只能簽核「待審」的案子（草稿還沒送審不能簽）。已核可的案子如需修改，業務按「📤 送審」→ 確認後會退回草稿重新編輯。
+  </p>
 
   <h2 class="sec">自動通知信</h2>
   <table class="mail">

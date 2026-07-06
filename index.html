@@ -246,6 +246,8 @@
   .planner-mode #btn-save{display:none}
   .assign-banner{background:#E8F6EC;border:1.5px solid #4ECB71;border-radius:8px;padding:11px 16px;font-size:13.5px;font-weight:600;color:#1E6B38;margin-bottom:14px;line-height:1.7}
   .record-item-pm{font-size:11px;color:#1E6B38;background:#E8F6EC;border-radius:4px;padding:2px 6px;margin-top:4px;display:inline-block}
+  .readonly-mode #btn-export-all{display:none}
+  .stage-hint{display:none;background:#F0F3F7;border:1.5px solid #B8C4D4;border-radius:8px;padding:11px 16px;font-size:13.5px;font-weight:600;color:#44546A;margin-bottom:14px;line-height:1.7}
 
   /* Sync indicator */
   .sync-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#4ECB71;margin-right:4px;animation:pulse 2s infinite}
@@ -299,10 +301,8 @@
       <button class="btn-new" onclick="newRecord()"><span>＋</span> 新增專案需求表</button>
       <input class="records-search" id="records-search" type="text" placeholder="搜尋客戶或專案…">
       <div class="btn-io-row">
-        <button class="btn-io" onclick="exportAll()">⬇ 匯出全部</button>
-        <button class="btn-io" onclick="importJSON()">⬆ 匯入</button>
+        <button class="btn-io" id="btn-export-all" onclick="exportAll()">⬇ 匯出全部</button>
       </div>
-      <input type="file" id="json-file-input" accept=".json" style="display:none">
     </div>
     <div class="sidebar-body" id="records-list">
       <div class="records-empty">尚無紀錄<br>填寫後點「儲存」建立第一份</div>
@@ -325,7 +325,7 @@
       <button onclick="exportCurrent()">📥 匯出</button>
       <button class="primary" onclick="printWithValidation()">🖨 列印 / PDF</button>
       <button onclick="window.open('https://nomowho.github.io/proposal-brief/guide.html','_blank')" title="查看簽核流程說明">📖 流程說明</button>
-      <button onclick="changeManagerPin()" id="btn-change-pin" style="display:none" title="變更主管密碼">🔑 改密碼</button>
+      <button onclick="changeMyPin()" id="btn-change-pin" title="變更自己的登入密碼">🔑 改密碼</button>
       <button onclick="logout()" title="登出">🚪</button>
     </div>
 
@@ -347,6 +347,7 @@
         <div class="mgr-hint">⚑ 主管簽核模式：左側選擇案件後，完整內容請看<strong>右側預覽</strong>。填寫「企劃回覆」與「簽核區」後，按上方 <strong>✅ 核可並通知</strong> 或 <strong>🔴 退件並通知</strong> 完成流程。</div>
         <div class="planner-hint">🎯 企劃檢視模式：左側只列出<strong>指派給你的案子</strong>（依業務分組），點選後完整需求內容請看<strong>右側預覽</strong>，可按「🖨 列印 / PDF」輸出。</div>
         <div class="assign-banner" id="assign-banner" style="display:none"></div>
+        <div class="stage-hint" id="stage-hint"></div>
 
         <div class="section" data-section="A">
           <div class="section-header" onclick="toggleSection(this)">
@@ -850,11 +851,15 @@ const SALES_PIN = '20905449';
 const DEFAULT_MANAGER_PIN = '20905449';
 const MANAGER_NAME = '郭燕蓉';
 let managerPin = DEFAULT_MANAGER_PIN;
-// 主管自訂密碼存雲端，開頁即讀取
+let userPins = {}; // 業務與企劃的個人密碼（雲端），未設定者用預設 SALES_PIN
+// 自訂密碼存雲端，開頁即讀取
 try{
   firebase.database().ref('proposal-briefs-config/managerPin').on('value', s=>{
     const v = s.val();
     if(v) managerPin = String(v);
+  });
+  firebase.database().ref('proposal-briefs-config/pins').on('value', s=>{
+    userPins = s.val() || {};
   });
 } catch(e){}
 
@@ -945,7 +950,7 @@ function doLogin(){
   const pin = document.getElementById('login-pin').value.trim();
   const err = document.getElementById('login-error');
   if(!name){ err.textContent='請選擇姓名'; return; }
-  const expected = loginRoleTmp==='manager' ? managerPin : SALES_PIN;
+  const expected = loginRoleTmp==='manager' ? managerPin : String(userPins[name] || SALES_PIN);
   if(pin!==expected){ err.textContent='密碼錯誤'; return; }
   userRole = loginRoleTmp;
   userName = name;
@@ -957,6 +962,12 @@ function doLogin(){
 // 主管：完成簽核 → 存檔並通知業務 + 企劃
 function finishApproval(status){
   if(!currentId){ alert('請先從左側選擇要簽核的案子'); return; }
+  // 僅「待審」案可簽核：草稿還沒送審、已核可/退件已有結果（需業務重新送審）
+  const st = currentStatus();
+  if(st!=='pending'){
+    alert(`僅「🟡 待審」的案子可以簽核。\n\n此案目前為：${(STATUS_LABEL[st]||'草稿').replace(/[🟡🟢🔴]/g,'').trim()}${st==='draft'?'（業務尚未送審）':'（如需重新簽核，請業務重新送審）'}`);
+    return;
+  }
   // 直接由按鈕傳入 status，同步更新 radio
   if(status){
     const radio = document.querySelector(`[name="approvalStatus"][value="${status}"]`);
@@ -997,18 +1008,22 @@ function finishApproval(status){
   });
 }
 
-function changeManagerPin(){
-  const cur = prompt('請輸入目前的主管密碼：');
+// 所有角色都可改自己的密碼（主管存 managerPin，業務/企劃存 pins/<姓名>）
+function changeMyPin(){
+  const isMgr = userRole==='manager';
+  const cur = prompt('請輸入目前的密碼：');
   if(cur===null) return;
-  if(cur.trim()!==managerPin){ alert('❌ 密碼錯誤'); return; }
+  const expected = isMgr ? managerPin : String(userPins[userName] || SALES_PIN);
+  if(cur.trim()!==expected){ alert('❌ 密碼錯誤'); return; }
   const next = prompt('請輸入新密碼（至少 4 碼）：');
   if(next===null) return;
   if(next.trim().length<4){ alert('❌ 新密碼至少 4 碼'); return; }
   const confirm2 = prompt('請再輸入一次新密碼確認：');
   if(confirm2===null) return;
   if(next.trim()!==confirm2.trim()){ alert('❌ 兩次輸入不一致'); return; }
-  db.ref('proposal-briefs-config/managerPin').set(next.trim())
-    .then(()=>showToast('🔑 主管密碼已更新（雲端同步）'))
+  const ref = isMgr ? 'proposal-briefs-config/managerPin' : 'proposal-briefs-config/pins/'+userName;
+  db.ref(ref).set(next.trim())
+    .then(()=>showToast('🔑 密碼已更新（雲端同步）'))
     .catch(e=>alert('❌ 更新失敗：'+e.message));
 }
 
@@ -1035,7 +1050,7 @@ function applyRoleUI(){
   badge.textContent = isMgr ? '⚑ 主管' : (isPlanner ? '🎯 企劃' : '👤 業務');
   badge.classList.toggle('mgr', isMgr);
   document.querySelector('.btn-new').style.display = (isMgr || isPlanner) ? 'none' : 'block';
-  document.getElementById('btn-change-pin').style.display = isMgr ? 'inline-block' : 'none';
+  document.getElementById('btn-change-pin').style.display = 'inline-block';
   document.getElementById('btn-approve').style.display = isMgr ? 'inline-block' : 'none';
   document.getElementById('btn-reject').style.display = isMgr ? 'inline-block' : 'none';
   if(isMgr){
@@ -1052,19 +1067,54 @@ function applyRoleUI(){
 
 // G（企劃回覆）與 I（簽核）為主管專屬區；其餘為業務區
 const MANAGER_SECTIONS = ['G','I'];
+
+// 目前開啟案子的簽核狀態（以雲端紀錄為準，不看表單 radio）
+function currentStatus(){
+  if(!currentId) return 'draft';
+  const rec = records.find(r=>r.id===currentId);
+  return rec?.data?.approvalStatus || 'draft';
+}
+
+// 階段鎖：只有輪到自己的階段才能編輯
+// 業務：草稿/退件可編輯（待審=主管審核中、已核可=定案，皆唯讀）
+// 主管：僅待審案可填 G/I 與簽核
+function canEditCurrentRecord(){
+  const st = currentStatus();
+  if(userRole==='sales') return !currentId || st==='draft' || st==='rejected';
+  if(userRole==='manager') return !!currentId && st==='pending';
+  return false; // 企劃一律唯讀
+}
+
+function updateStageHint(){
+  const el = document.getElementById('stage-hint');
+  if(!el) return;
+  const st = currentStatus();
+  let msg = '';
+  if(userRole==='sales' && currentId){
+    if(st==='pending') msg = '🔒 此案已送審，主管審核中，目前唯讀。';
+    else if(st==='approved') msg = '🔒 此案已核可（唯讀）。如需修改，按「📤 送審」可重新開啟為草稿。';
+  } else if(userRole==='manager' && currentId && st!=='pending'){
+    msg = `🔒 僅「🟡 待審」的案子可填寫與簽核（此案目前為：${STATUS_LABEL[st]||'草稿'}）。`;
+  }
+  el.textContent = msg;
+  el.style.display = msg ? 'block' : 'none';
+}
+
 function lockNonApprovalSections(){
   const isMgr = userRole==='manager';
   const isPlanner = userRole==='planner';
+  const stageOK = canEditCurrentRecord();
   document.querySelectorAll('.section').forEach(sec=>{
     const isMgrSection = MANAGER_SECTIONS.includes(sec.dataset.section);
-    // 企劃：全部唯讀，內容看右側預覽
-    const editable = isPlanner ? false : (isMgr ? isMgrSection : !isMgrSection);
+    // 企劃：全部唯讀，內容看右側預覽；業務/主管：角色區 + 階段輪到自己才可編輯
+    const editable = isPlanner ? false : (isMgr ? (isMgrSection && stageOK) : (!isMgrSection && stageOK));
     sec.classList.toggle('locked', !editable);
     sec.querySelectorAll('input, textarea, select').forEach(el=>{
       if(editable){ el.removeAttribute('disabled'); }
       else { el.setAttribute('disabled','disabled'); }
     });
   });
+  updateStageHint();
 }
 
 // ═══ Firebase 同步 ═══
@@ -1084,6 +1134,7 @@ function initFirebaseSync(){
         fillForm(rec.data||{});
         render();
         updateBadge();
+        lockNonApprovalSections(); // 狀態可能被對方改變，重算階段鎖
       }
     }
   }, err=>{
@@ -1195,10 +1246,17 @@ function newRecord(){
   render();
   renderRecordsList();
   updateBadge();
+  lockNonApprovalSections(); // 新單：業務可編輯
   document.getElementById('panel-form').scrollTop = 0;
 }
 
-function saveRecord(){
+function saveRecord(force){
+  // 階段鎖：不在自己的流程階段不能儲存覆蓋（force=系統內部流程用）
+  if(!force && !canEditCurrentRecord()){
+    updateStageHint();
+    showToast('🔒 此案目前唯讀，無法儲存');
+    return;
+  }
   const data = collect();
   const clientName = data.clientName || '（無客戶名）';
   const projectName = data.projectName || '（未命名專案）';
@@ -1237,6 +1295,25 @@ function saveAsNew(){
 }
 
 function submitForApproval(){
+  const st = currentStatus();
+  if(currentId && st==='pending'){
+    showToast('🟡 此案已在待審中，不需重複送審');
+    return;
+  }
+  if(currentId && st==='approved'){
+    if(!confirm('此案已核可，重新送審將清除簽核狀態？')) return;
+    // 清除簽核 → 退回草稿，開放業務編輯，修改後再正式送審
+    document.querySelectorAll('[name="approvalStatus"]').forEach(r=>{ r.checked = (r.value==='draft'); });
+    const an = document.querySelector('[data-key="approverName"]'); if(an) an.value='';
+    const ad = document.querySelector('[data-key="approvalDate"]'); if(ad) ad.value='';
+    const ac = document.querySelector('[data-key="approvalComment"]'); if(ac) ac.value='';
+    saveRecord(true);
+    render();
+    lockNonApprovalSections();
+    renderRecordsList();
+    showToast('↩ 已重新開啟為草稿，修改後請再按「📤 送審」');
+    return;
+  }
   const d = collect();
   const missing = getMissingRequired(d);
   if(missing.length){
@@ -1251,8 +1328,8 @@ function submitForApproval(){
   const statusEl = document.querySelector('[data-key="approvalStatus"][value="pending"]');
   if(statusEl){ statusEl.checked = true; }
   render();
-  scheduleAutoSave();
-  saveRecord();
+  saveRecord(true); // 送審當下狀態轉待審，強制存檔後進入主管階段
+  lockNonApprovalSections();
   const clientName = d.clientName || '';
   const projectName = d.projectName || '';
   const applicant = d.applicant || '';
@@ -1312,6 +1389,7 @@ function loadRecord(id){
   render();
   updateBadge();
   renderRecordsList();
+  lockNonApprovalSections(); // 依此案狀態重算階段鎖
   document.getElementById('panel-form').scrollTop = 0;
 }
 
@@ -1320,6 +1398,7 @@ function deleteRecord(id, ev){
   if(userRole!=='sales'){ showToast('只有業務可以刪除紀錄'); return; }
   const rec = records.find(r=>r.id===id);
   if(!rec) return;
+  if((rec.ownerName||'')!==userName){ showToast('只能刪除自己建立的案子'); return; }
   if(!confirm(`確定刪除「${rec.clientName} · ${rec.projectName}」？`)) return;
   if(currentId===id){ currentId=null; newRecord(); }
   deleteFromFirebase(id);
@@ -1330,6 +1409,10 @@ function deleteRecord(id, ev){
 function renderRecordsList(){
   const container = document.getElementById('records-list');
   let list = records;
+  // 業務：只列出自己建立的案子
+  if(userRole==='sales'){
+    list = list.filter(r => (r.ownerName||'')===userName);
+  }
   // 企劃：只列出被指派給自己的案子（活動主責或數位主責）
   if(userRole==='planner'){
     list = list.filter(r => r.data?.eventPM===userName || r.data?.digitalPM===userName);
@@ -1416,53 +1499,20 @@ function exportCurrent(){
 }
 
 function exportAll(){
-  if(records.length===0){ showToast('沒有紀錄可匯出'); return; }
+  // 業務只匯出自己的案子
+  const mine = userRole==='sales' ? records.filter(r=>(r.ownerName||'')===userName) : records;
+  if(mine.length===0){ showToast('沒有紀錄可匯出'); return; }
   const filename = `專案需求_全部備份_${new Date().toISOString().slice(0,10)}.json`;
-  const blob = new Blob([JSON.stringify({version:2, records}, null, 2)], {type:'application/json'});
+  const blob = new Blob([JSON.stringify({version:2, records: mine}, null, 2)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = filename;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  showToast(`⬇ 已匯出 ${records.length} 筆紀錄`);
+  showToast(`⬇ 已匯出 ${mine.length} 筆紀錄`);
 }
 
-function importJSON(){ document.getElementById('json-file-input').click(); }
-
-document.getElementById('json-file-input').addEventListener('change', evt=>{
-  const file = evt.target.files[0];
-  if(!file) return;
-  const reader = new FileReader();
-  reader.onload = e=>{
-    try{
-      const parsed = JSON.parse(e.target.result);
-      // 判斷是全部備份還是單一 record
-      if(parsed && parsed.version===2 && Array.isArray(parsed.records)){
-        if(!confirm(`匯入 ${parsed.records.length} 筆紀錄？（會與目前紀錄合併）`)) return;
-        parsed.records.forEach(r=>{
-          if(!records.some(x=>x.id===r.id)) records.push(r);
-        });
-        saveStorage();
-        renderRecordsList();
-        showToast(`⬆ 已匯入 ${parsed.records.length} 筆`);
-      } else {
-        // 單一表單資料
-        const now = new Date().toISOString();
-        const id = genId();
-        records.unshift({
-          id, clientName: parsed.clientName||'（無客戶名）',
-          projectName: parsed.projectName||'（匯入專案）',
-          createdAt: now, updatedAt: now, data: parsed
-        });
-        saveStorage();
-        loadRecord(id);
-        showToast(`📤 已匯入：${file.name}`);
-      }
-    } catch(err){ showToast('❌ JSON 格式錯誤'); }
-  };
-  reader.readAsText(file, 'utf-8');
-  evt.target.value = '';
-});
+// 匯入功能已移除（2026-07-06）：僅本機寫入不同步雲端，會產生幽靈資料
 
 // ═══ 預覽渲染 ═══
 function render(){
@@ -1656,6 +1706,7 @@ function scheduleAutoSave(){
   clearTimeout(autoSaveTimer);
   autoSaveTimer = setTimeout(()=>{
     if(!currentId) return; // 新單不自動存
+    if(!canEditCurrentRecord()) return; // 階段鎖：非自己階段不自動覆蓋
     const data = collect();
     const idx = records.findIndex(r=>r.id===currentId);
     if(idx>-1){
