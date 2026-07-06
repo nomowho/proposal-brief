@@ -612,8 +612,8 @@
               <div style="display:none"><label>簽核日期</label><input type="date" data-key="approvalDate"></div><!-- 簽核時自動記錄 -->
             </div>
             <div class="row">
-              <label>主管意見 / 退件原因</label>
-              <textarea data-key="approvalComment" placeholder="主管審核後填寫意見；若退件請說明原因與修改方向"></textarea>
+              <label>主管意見 / 退件原因 <span style="color:#E74C3C;font-weight:700">（退件必填）</span></label>
+              <textarea data-key="approvalComment" placeholder="主管審核後填寫意見；退件時必須說明原因與修改方向"></textarea>
             </div>
           </div>
         </div>
@@ -963,8 +963,15 @@ function finishApproval(status){
     if(radio){ radio.checked = true; }
   }
   const d = collect();
-  if(d.approvalStatus==='rejected' && !d.approvalComment){
-    if(!confirm('退件建議填寫「主管意見/退件原因」讓業務知道修改方向。\n\n確定不填直接送出？')) return;
+  if(d.approvalStatus==='rejected' && !(d.approvalComment||'').trim()){
+    alert('退件前請先填寫「主管意見 / 退件原因」，讓業務知道修改方向。');
+    const commentEl = document.querySelector('[data-key="approvalComment"]');
+    if(commentEl){
+      const sec = commentEl.closest('.section');
+      if(sec) sec.scrollIntoView({behavior:'smooth', block:'center'});
+      commentEl.focus();
+    }
+    return;
   }
   // 簽核當下自動記錄簽核日期與決定日期
   const today = new Date().toISOString().slice(0,10);
